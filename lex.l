@@ -1,84 +1,91 @@
-%option noyywrap
-%option yylineno
-
 %{
-#include <stdio.h>
+#include "parser.tab.h"
 #include <stdlib.h>
+#include <string.h>
+
 #define YY_NO_UNPUT
-
-// Déclarations pour les couleurs (si supporté)
-#define RED "\x1b[31m"
-#define GREEN "\x1b[32m"
-#define BLUE "\x1b[34m"
-#define YELLOW "\x1b[33m"
-#define MAGENTA "\x1b[35m"
-#define CYAN "\x1b[36m"
-#define RESET "\x1b[0m"
-
-int yylex(void);
+extern int yylineno;  // Supprimez la redéfinition ici
 %}
 
-%%
+%option noyywrap
 
-"abstract"|"assert"|"boolean"|"break"|"byte"|"case"|"catch"|"char"|"class"|"const"|"continue"|"default"|"do"|"double"|"else"|"enum"|"extends"|"final"|"finally"|"float"|"for"|"goto"|"if"|"implements"|"import"|"instanceof"|"int"|"interface"|"long"|"native"|"new"|"package"|"private"|"protected"|"public"|"return"|"short"|"static"|"strictfp"|"super"|"switch"|"synchronized"|"this"|"throw"|"throws"|"transient"|"try"|"void"|"volatile"|"while"|"true"|"false" { 
-    printf(GREEN "MOT_CLÉ" RESET " : %s (ligne %d)\n", yytext, yylineno); 
-}
-
-"String"|"boolean"|"byte"|"char"|"double"|"float"|"int"|"long"|"short"|"ArithmeticException"|"NullPointerException"|"IOException" { 
-    printf(BLUE "TYPE" RESET " : %s (ligne %d)\n", yytext, yylineno); 
-}
-
-System\.out\.println|System\.out\.print { 
-    printf(MAGENTA "APPEL_METHODE" RESET " : %s (ligne %d)\n", yytext, yylineno); 
-}
-
-[a-zA-Z_][a-zA-Z0-9_]* { 
-    printf("IDENTIFICATEUR : %s (ligne %d)\n", yytext, yylineno); 
-}
-
-[0-9]+ { 
-    printf(CYAN "NOMBRE_ENTIER" RESET " : %s (ligne %d)\n", yytext, yylineno); 
-}
-
-[0-9]+\.[0-9]+ { 
-    printf(CYAN "NOMBRE_DECIMAL" RESET " : %s (ligne %d)\n", yytext, yylineno); 
-}
-
-"+"|"-"|"*"|"/"|"%"|"="|"=="|"!="|">"|"<"|">="|"<="|"&&"|"||"|"!"|"++"|"--"|"+="|"-="|"*="|"/=" { 
-    printf(YELLOW "OPÉRATEUR" RESET " : %s (ligne %d)\n", yytext, yylineno); 
-}
-
-":"|";"|"{"|"}"|"("|")"|"["|"]"|","|"." { 
-    printf(RED "SÉPARATEUR" RESET " : %s (ligne %d)\n", yytext, yylineno); 
-}
-
-\"([^\"\\]|\\.)*\" { 
-    printf("CHAINE_DE_CARACTERES : %s (ligne %d)\n", yytext, yylineno); 
-}
-
-\'.\'|\'\\.\' { 
-    printf("CARACTERE : %s (ligne %d)\n", yytext, yylineno); 
-}
-
-"//".*    { 
-    printf("COMMENTAIRE_LIGNE : %s (ligne %d)\n", yytext, yylineno); 
-}
-
-"/*"([^*]|"*"+[^*/])*"*"+"/" { 
-    printf("COMMENTAIRE_BLOC : trouvé (ligne %d)\n", yylineno); 
-}
-
-[ \t]+    { /* Ignorer les espaces et tabulations */ }
-
-\n        { /* Ignorer les nouvelles lignes mais incrémenter yylineno */ }
-
-. { 
-    printf("TOKEN_NON_RECONNU : %s (ligne %d)\n", yytext, yylineno); 
-}
+%option yylineno  
 
 %%
 
-int main() {
-    yylex();
-    return 0;
-}
+"import"       { return IMPORT; }
+"public"       { return PUBLIC; }
+"class"        { return CLASS; }
+"static"       { return STATIC; }
+"void"         { return VOID; }
+"int"          { return INT; }
+"double"       { return DOUBLE; }
+"String"       { return STRING; }  // Changé de STRING_TYPE à STRING
+"char"         { return CHAR; }
+"boolean"      { return BOOLEAN; }
+"if"           { return IF; }
+"else"         { return ELSE; }
+"for"          { return FOR; }
+"while"        { return WHILE; }
+"switch"       { return SWITCH; }
+"case"         { return CASE; }
+"default"      { return DEFAULT; }
+"try"          { return TRY; }
+"catch"        { return CATCH; }
+"finally"      { return FINALLY; }
+"System.out.println" { return PRINTLN; }
+"true"         { return BOOLEAN_LITERAL; }
+"false"        { return BOOLEAN_LITERAL; }
+"null"         { return NULL_LITERAL; }
+"new"          { return NEW; }
+"extends"      { return EXTENDS; }
+"implements"   { return IMPLEMENTS; }
+"this"         { return THIS; }
+"super"        { return SUPER; }
+"return"       { return RETURN; }
+"break"        { return BREAK; }
+"continue"     { return CONTINUE; }
+
+"+"            { return PLUS; }
+"-"            { return MINUS; }
+"*"            { return STAR; }  // Utilisez STAR au lieu de WILDCARD
+"/"            { return DIVIDE; }
+"="            { return ASSIGN; }
+"=="           { return EQ; }
+"!="           { return NEQ; }
+">"            { return GT; }
+"<"            { return LT; }
+">="           { return GTE; }
+"<="           { return LTE; }
+"++"           { return PLUSPLUS; }  // Changé de INC à PLUSPLUS
+"--"           { return MINUSMINUS; } // Changé de DEC à MINUSMINUS
+"&&"           { return AND; }
+"||"           { return OR; }
+"!"            { return NOT; }
+"{"            { return LBRACE; }
+"}"            { return RBRACE; }
+"("            { return LPAREN; }
+")"            { return RPAREN; }
+"["            { return LBRACKET; }
+"]"            { return RBRACKET; }
+";"            { return SEMICOLON; }
+","            { return COMMA; }
+"."            { return DOT; }
+":"            { return COLON; }
+"?"            { return QUESTION; }
+
+[0-9]+         { yylval.num = atoi(yytext); return INTEGER_LITERAL; }
+[0-9]+\.[0-9]+ { yylval.dbl = atof(yytext); return FLOAT_LITERAL; }  // Changé fnum en dbl
+\"[^"\n]*\"    { yylval.str = strdup(yytext); return STRING_LITERAL; }
+\'[^'\n]\'     { yylval.chr = yytext[1]; return CHAR_LITERAL; }  // Changé ch en chr
+[a-zA-Z_][a-zA-Z0-9_]* { yylval.str = strdup(yytext); return IDENTIFIER; }
+
+[ \t\r]+       ;  // Ignore whitespace
+\n             ;  // Les nouvelles lignes sont gérées par yylineno
+"//".*         ;  // Ignore single-line comments
+"/*"(.|\n)*"*/" ; // Ignore multi-line comments
+
+.              { printf("Unknown token: %s\n", yytext); }
+
+%%
+
