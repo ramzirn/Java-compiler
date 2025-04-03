@@ -27,6 +27,7 @@ void yyerror(const char *s) {
 %token LBRACE RBRACE LPAREN RPAREN LBRACKET RBRACKET SEMICOLON COMMA DOT COLON STAR 
 %token PLUS MINUS TIMES DIVIDE ASSIGN EQ NEQ LT GT LTE GTE AND OR NOT
 %token INTEGER_LITERAL FLOAT_LITERAL STRING_LITERAL CHAR_LITERAL BOOLEAN_LITERAL IDENTIFIER
+%token PRIVATE PROTECTED FINAL CAST
 
 %left OR
 %left AND
@@ -36,6 +37,7 @@ void yyerror(const char *s) {
 %left TIMES DIVIDE
 %right NOT
 %nonassoc UMINUS
+%right CAST
 
 %start program
 
@@ -96,9 +98,10 @@ class_member:
 
 field_decl:
     modifiers type IDENTIFIER SEMICOLON
-    | modifiers type IDENTIFIER ASSIGN expression SEMICOLON
+    | modifiers type IDENTIFIER LBRACKET RBRACKET SEMICOLON
+    | modifiers type IDENTIFIER LBRACKET RBRACKET ASSIGN array_init SEMICOLON
+    | modifiers type IDENTIFIER ASSIGN array_init SEMICOLON
     ;
-
 
 method_decl:
     modifiers type IDENTIFIER LPAREN param_list_opt RPAREN method_body
@@ -121,7 +124,10 @@ modifiers:
 
 modifier:
     PUBLIC
+    | PRIVATE
+    | PROTECTED
     | STATIC
+    | FINAL
     ;
 
 type:
@@ -131,7 +137,8 @@ type:
     | BOOLEAN
     | STRING
     | VOID
-    | IDENTIFIER   // Pour les types définis par l'utilisateur
+    | IDENTIFIER
+    | type LBRACKET RBRACKET
     ;
 
 expression:
@@ -143,14 +150,57 @@ expression:
     | expression MINUS expression
     | expression STAR expression
     | expression DIVIDE expression
+    | LPAREN expression RPAREN
+    | CAST expression
+    | NEW array_creation
+    | array_access
+    | method_invocation
     ;
 
+array_creation:
+    type LBRACKET expression RBRACKET
+    | type LBRACKET RBRACKET array_initializer
+    | type LBRACKET expression RBRACKET array_dimensions
+    ;
+
+array_initializer:
+    LBRACE expression_list RBRACE
+    | LBRACE RBRACE
+    ;
+
+array_access:
+    IDENTIFIER LBRACKET expression RBRACKET
+    | array_access LBRACKET expression RBRACKET
+    ;
+
+array_dimensions:
+    LBRACKET expression RBRACKET
+    | array_dimensions LBRACKET expression RBRACKET
+    ;
+
+array_init:
+    NEW array_creation
+    | LBRACE expression_list RBRACE
+    ;
+
+expression_list:
+    expression
+    | expression_list COMMA expression
+    ;
+
+method_invocation:
+    IDENTIFIER LPAREN argument_list RPAREN
+    ;
+
+argument_list:
+    /* empty */
+    | expression
+    | argument_list COMMA expression
+    ;
 param_list:
-    /* Liste vide */
-    | type IDENTIFIER
+    type IDENTIFIER
     | param_list COMMA type IDENTIFIER
     ;
-
 method_body:
     LBRACE RBRACE
     | LBRACE statement_list RBRACE
@@ -161,7 +211,7 @@ constructor_body:
     | LBRACE statement_list RBRACE
     ;
 
-statement_list:
+statement_list: 
     statement
     | statement_list statement
     ;
@@ -170,10 +220,10 @@ statement:
     expression SEMICOLON
     | type IDENTIFIER SEMICOLON
     | type IDENTIFIER ASSIGN expression SEMICOLON
-    | SEMICOLON   // Pour les déclarations vides
+    | SEMICOLON
+    | IDENTIFIER ASSIGN array_init SEMICOLON
+    | array_access ASSIGN expression SEMICOLON
     ;
-
-/* Ajout d'autres règles ici pour compléter... */
 
 %%
 

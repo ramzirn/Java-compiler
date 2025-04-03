@@ -45,6 +45,9 @@ extern int yylineno;
 "return"       { return RETURN; }
 "break"        { return BREAK; }
 "continue"     { return CONTINUE; }
+"private"      { return PRIVATE; }
+"protected"    { return PROTECTED; }
+"final"        { return FINAL; }
 
 "+"            { return PLUS; }
 "-"            { return MINUS; }
@@ -79,6 +82,7 @@ extern int yylineno;
 \"[^"\n]*\"  { yylval.str = strdup(yytext); return STRING_LITERAL; }
 \'[^'\n]\'   { yylval.chr = yytext[1]; return CHAR_LITERAL; }
 [a-zA-Z_][a-zA-Z0-9_]* { yylval.str = strdup(yytext); return IDENTIFIER; }
+"("[ \t]*"int"[ \t]*")"    { return CAST; }  // Capture (int)
 
 [ \t\r]+       ;
 \n             ;
