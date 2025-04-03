@@ -16,27 +16,18 @@ void yyerror(const char *s) {
 %union {
     char* str;
     int num;
-    double dbl;  // Changé fnum en dbl
-    char chr;    // Changé ch en chr
+    double dbl;
+    char chr;
 }
 
-/* Déclaration des tokens */
 %token NULL_LITERAL PLUSPLUS MINUSMINUS QUESTION
-%token STRING  // Assurez-vous que c'est déclaré
-%token IMPORT PUBLIC CLASS STATIC VOID INT DOUBLE STRING CHAR BOOLEAN
+%token STRING IMPORT PUBLIC CLASS STATIC VOID INT DOUBLE CHAR BOOLEAN
 %token IF ELSE FOR WHILE SWITCH CASE DEFAULT TRY CATCH FINALLY
-%token EXTENDS IMPLEMENTS NEW THIS SUPER
-%token PRINTLN RETURN BREAK CONTINUE
-%token LBRACE RBRACE LPAREN RPAREN LBRACKET RBRACKET
-%token SEMICOLON COMMA DOT COLON STAR QUESTION
-%token PLUS MINUS TIMES DIVIDE ASSIGN
-%token EQ NEQ LT GT LTE GTE
-%token AND OR NOT
-%token PLUSPLUS MINUSMINUS QUESTION
-%token INTEGER_LITERAL FLOAT_LITERAL STRING_LITERAL CHAR_LITERAL BOOLEAN_LITERAL
-%token IDENTIFIER
+%token EXTENDS IMPLEMENTS NEW THIS SUPER PRINTLN RETURN BREAK CONTINUE
+%token LBRACE RBRACE LPAREN RPAREN LBRACKET RBRACKET SEMICOLON COMMA DOT COLON STAR 
+%token PLUS MINUS TIMES DIVIDE ASSIGN EQ NEQ LT GT LTE GTE AND OR NOT
+%token INTEGER_LITERAL FLOAT_LITERAL STRING_LITERAL CHAR_LITERAL BOOLEAN_LITERAL IDENTIFIER
 
-/* Priorités des opérateurs */
 %left OR
 %left AND
 %left EQ NEQ
@@ -55,7 +46,6 @@ program:
     ;
 
 import_decls:
-    /* vide */
     | import_decls import_decl
     ;
 
@@ -80,7 +70,6 @@ class_decl:
     ;
 
 class_modifiers:
-    /* vide */
     | PUBLIC
     | STATIC
     | class_modifiers class_modifier
@@ -96,7 +85,6 @@ class_body:
     ;
 
 class_members:
-    /* vide */
     | class_members class_member
     ;
 
@@ -111,8 +99,14 @@ field_decl:
     | modifiers type IDENTIFIER ASSIGN expression SEMICOLON
     ;
 
+
 method_decl:
-    modifiers type IDENTIFIER LPAREN param_list RPAREN method_body
+    modifiers type IDENTIFIER LPAREN param_list_opt RPAREN method_body
+    ;
+
+param_list_opt:
+    /* vide */
+    | param_list
     ;
 
 constructor_decl:
@@ -120,7 +114,6 @@ constructor_decl:
     ;
 
 modifiers:
-    /* vide */
     | PUBLIC
     | STATIC
     | modifiers modifier
@@ -132,181 +125,55 @@ modifier:
     ;
 
 type:
-    primitive_type
-    | reference_type
-    | array_type
-    ;
-
-primitive_type:
     INT
     | DOUBLE
-    | BOOLEAN
     | CHAR
-    ;
-
-reference_type:
-    IDENTIFIER
-    ;
-
-array_type:
-    type LBRACKET RBRACKET
-    ;
-
-param_list:
-    /* vide */
-    | params
-    ;
-
-params:
-    param
-    | params COMMA param
-    ;
-
-param:
-    type IDENTIFIER
-    ;
-
-method_body:
-    SEMICOLON
-    | block
-    ;
-
-constructor_body:
-    block
-    ;
-
-block:
-    LBRACE block_stmts RBRACE
-    ;
-
-block_stmts:
-    /* vide */
-    | block_stmts block_stmt
-    ;
-
-block_stmt:
-    local_var_decl SEMICOLON
-    | statement
-    ;
-
-local_var_decl:
-    type IDENTIFIER
-    | type IDENTIFIER ASSIGN expression
-    ;
-
-statement:
-    block
-    | IF LPAREN expression RPAREN statement
-    | IF LPAREN expression RPAREN statement ELSE statement
-    | FOR LPAREN for_init SEMICOLON expr_opt SEMICOLON expr_opt RPAREN statement
-    | WHILE LPAREN expression RPAREN statement
-    | RETURN expression SEMICOLON
-    | PRINTLN LPAREN expression RPAREN SEMICOLON
-    | expression SEMICOLON
-    ;
-
-for_init:
-    /* vide */
-    | local_var_decl
-    | expression
-    ;
-
-expr_opt:
-    /* vide */
-    | expression
+    | BOOLEAN
+    | STRING
+    | VOID
+    | IDENTIFIER   // Pour les types définis par l'utilisateur
     ;
 
 expression:
-    assignment
-    ;
-
-assignment:
-    conditional
-    | IDENTIFIER ASSIGN assignment
-    ;
-
-conditional:
-    logical_or
-    | logical_or '?' expression ':' conditional
-    ;
-
-logical_or:
-    logical_and
-    | logical_or OR logical_and
-    ;
-
-logical_and:
-    equality
-    | logical_and AND equality
-    ;
-
-equality:
-    relational
-    | equality EQ relational
-    | equality NEQ relational
-    ;
-
-relational:
-    additive
-    | relational LT additive
-    | relational GT additive
-    | relational LTE additive
-    | relational GTE additive
-    ;
-
-additive:
-    multiplicative
-    | additive PLUS multiplicative
-    | additive MINUS multiplicative
-    ;
-
-multiplicative:
-    unary
-    | multiplicative TIMES unary
-    | multiplicative DIVIDE unary
-    ;
-
-unary:
-    postfix
-    | PLUS unary
-    | MINUS unary %prec UMINUS
-    | NOT unary
-    ;
-
-postfix:
-    primary
-    | postfix LBRACKET expression RBRACKET
-    | postfix DOT IDENTIFIER
-    | postfix LPAREN argument_list RPAREN
-    ;
-
-primary:
-    INTEGER_LITERAL
+    IDENTIFIER
+    | INTEGER_LITERAL
     | FLOAT_LITERAL
     | STRING_LITERAL
-    | CHAR_LITERAL
-    | BOOLEAN_LITERAL
-    | IDENTIFIER
-    | THIS
-    | SUPER
-    | NEW creator
-    | LPAREN expression RPAREN
+    | expression PLUS expression
+    | expression MINUS expression
+    | expression STAR expression
+    | expression DIVIDE expression
     ;
 
-creator:
-    IDENTIFIER LPAREN argument_list RPAREN
-    | primitive_type LBRACKET expression RBRACKET
+param_list:
+    /* Liste vide */
+    | type IDENTIFIER
+    | param_list COMMA type IDENTIFIER
     ;
 
-argument_list:
-    /* vide */
-    | arguments
+method_body:
+    LBRACE RBRACE
+    | LBRACE statement_list RBRACE
     ;
 
-arguments:
-    expression
-    | arguments COMMA expression
+constructor_body:
+    LBRACE RBRACE
+    | LBRACE statement_list RBRACE
     ;
+
+statement_list:
+    statement
+    | statement_list statement
+    ;
+
+statement:
+    expression SEMICOLON
+    | type IDENTIFIER SEMICOLON
+    | type IDENTIFIER ASSIGN expression SEMICOLON
+    | SEMICOLON   // Pour les déclarations vides
+    ;
+
+/* Ajout d'autres règles ici pour compléter... */
 
 %%
 
@@ -315,12 +182,10 @@ int main(int argc, char** argv) {
         fprintf(stderr, "Usage: %s <fichier.java>\n", argv[0]);
         return 1;
     }
-    
     yyin = fopen(argv[1], "r");
     if (!yyin) {
         perror("Erreur ouverture fichier");
         return 1;
     }
-    
     return yyparse();
 }

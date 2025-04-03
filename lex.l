@@ -1,14 +1,14 @@
+/* Fichier Flex corrigé */
 %{
 #include "parser.tab.h"
 #include <stdlib.h>
 #include <string.h>
 
 #define YY_NO_UNPUT
-extern int yylineno;  // Supprimez la redéfinition ici
+extern int yylineno;
 %}
 
 %option noyywrap
-
 %option yylineno  
 
 %%
@@ -20,7 +20,7 @@ extern int yylineno;  // Supprimez la redéfinition ici
 "void"         { return VOID; }
 "int"          { return INT; }
 "double"       { return DOUBLE; }
-"String"       { return STRING; }  // Changé de STRING_TYPE à STRING
+"String"       { return STRING; }
 "char"         { return CHAR; }
 "boolean"      { return BOOLEAN; }
 "if"           { return IF; }
@@ -48,7 +48,7 @@ extern int yylineno;  // Supprimez la redéfinition ici
 
 "+"            { return PLUS; }
 "-"            { return MINUS; }
-"*"            { return STAR; }  // Utilisez STAR au lieu de WILDCARD
+"*"            { return STAR; }
 "/"            { return DIVIDE; }
 "="            { return ASSIGN; }
 "=="           { return EQ; }
@@ -57,8 +57,8 @@ extern int yylineno;  // Supprimez la redéfinition ici
 "<"            { return LT; }
 ">="           { return GTE; }
 "<="           { return LTE; }
-"++"           { return PLUSPLUS; }  // Changé de INC à PLUSPLUS
-"--"           { return MINUSMINUS; } // Changé de DEC à MINUSMINUS
+"++"           { return PLUSPLUS; }
+"--"           { return MINUSMINUS; }
 "&&"           { return AND; }
 "||"           { return OR; }
 "!"            { return NOT; }
@@ -75,15 +75,15 @@ extern int yylineno;  // Supprimez la redéfinition ici
 "?"            { return QUESTION; }
 
 [0-9]+         { yylval.num = atoi(yytext); return INTEGER_LITERAL; }
-[0-9]+\.[0-9]+ { yylval.dbl = atof(yytext); return FLOAT_LITERAL; }  // Changé fnum en dbl
-\"[^"\n]*\"    { yylval.str = strdup(yytext); return STRING_LITERAL; }
-\'[^'\n]\'     { yylval.chr = yytext[1]; return CHAR_LITERAL; }  // Changé ch en chr
+[0-9]+\.[0-9]+ { yylval.dbl = atof(yytext); return FLOAT_LITERAL; }
+\"[^"\n]*\"  { yylval.str = strdup(yytext); return STRING_LITERAL; }
+\'[^'\n]\'   { yylval.chr = yytext[1]; return CHAR_LITERAL; }
 [a-zA-Z_][a-zA-Z0-9_]* { yylval.str = strdup(yytext); return IDENTIFIER; }
 
-[ \t\r]+       ;  // Ignore whitespace
-\n             ;  // Les nouvelles lignes sont gérées par yylineno
-"//".*         ;  // Ignore single-line comments
-"/*"(.|\n)*"*/" ; // Ignore multi-line comments
+[ \t\r]+       ;
+\n             ;
+"//".*         ;
+"/*"(.|\n)*"*/" ;
 
 .              { printf("Unknown token: %s\n", yytext); }
 
