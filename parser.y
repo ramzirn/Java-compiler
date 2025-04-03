@@ -23,11 +23,13 @@ void yyerror(const char *s) {
 %token NULL_LITERAL PLUSPLUS MINUSMINUS QUESTION
 %token STRING IMPORT PUBLIC CLASS STATIC VOID INT DOUBLE CHAR BOOLEAN
 %token IF ELSE FOR WHILE SWITCH CASE DEFAULT TRY CATCH FINALLY
-%token EXTENDS IMPLEMENTS NEW THIS SUPER PRINTLN RETURN BREAK CONTINUE
+%token EXTENDS IMPLEMENTS NEW THIS SUPER RETURN BREAK CONTINUE
 %token LBRACE RBRACE LPAREN RPAREN LBRACKET RBRACKET SEMICOLON COMMA DOT COLON STAR 
-%token PLUS MINUS TIMES DIVIDE ASSIGN EQ NEQ LT GT LTE GTE AND OR NOT
+%token PLUS MINUS TIMES DIVIDE ASSIGN PLUS_ASSIGN MINUS_ASSIGN TIMES_ASSIGN DIVIDE_ASSIGN
+%token EQ NEQ LT GT LTE GTE AND OR NOT
 %token INTEGER_LITERAL FLOAT_LITERAL STRING_LITERAL CHAR_LITERAL BOOLEAN_LITERAL IDENTIFIER
 %token PRIVATE PROTECTED FINAL CAST
+%token SYSTEM OUT PRINTLN
 
 %left OR
 %left AND
@@ -38,6 +40,7 @@ void yyerror(const char *s) {
 %right NOT
 %nonassoc UMINUS
 %right CAST
+%right ASSIGN PLUS_ASSIGN MINUS_ASSIGN TIMES_ASSIGN DIVIDE_ASSIGN
 
 %start program
 
@@ -48,6 +51,7 @@ program:
     ;
 
 import_decls:
+    /* empty */
     | import_decls import_decl
     ;
 
@@ -72,14 +76,16 @@ class_decl:
     ;
 
 class_modifiers:
-    | PUBLIC
-    | STATIC
+    /* empty */
     | class_modifiers class_modifier
     ;
 
 class_modifier:
     PUBLIC
     | STATIC
+    | PRIVATE
+    | PROTECTED
+    | FINAL
     ;
 
 class_body:
@@ -87,6 +93,7 @@ class_body:
     ;
 
 class_members:
+    /* empty */
     | class_members class_member
     ;
 
@@ -98,6 +105,7 @@ class_member:
 
 field_decl:
     modifiers type IDENTIFIER SEMICOLON
+    | modifiers type IDENTIFIER ASSIGN expression SEMICOLON
     | modifiers type IDENTIFIER LBRACKET RBRACKET SEMICOLON
     | modifiers type IDENTIFIER LBRACKET RBRACKET ASSIGN array_init SEMICOLON
     | modifiers type IDENTIFIER ASSIGN array_init SEMICOLON
@@ -108,8 +116,13 @@ method_decl:
     ;
 
 param_list_opt:
-    /* vide */
+    /* empty */
     | param_list
+    ;
+
+param_list:
+    type IDENTIFIER
+    | param_list COMMA type IDENTIFIER
     ;
 
 constructor_decl:
@@ -117,8 +130,7 @@ constructor_decl:
     ;
 
 modifiers:
-    | PUBLIC
-    | STATIC
+    /* empty */
     | modifiers modifier
     ;
 
@@ -146,15 +158,45 @@ expression:
     | INTEGER_LITERAL
     | FLOAT_LITERAL
     | STRING_LITERAL
+    | CHAR_LITERAL
+    | BOOLEAN_LITERAL
     | expression PLUS expression
     | expression MINUS expression
-    | expression STAR expression
+    | expression TIMES expression
     | expression DIVIDE expression
     | LPAREN expression RPAREN
-    | CAST expression
+    | CAST LPAREN type RPAREN expression
     | NEW array_creation
     | array_access
     | method_invocation
+    | expression GT expression
+    | expression LT expression
+    | expression LTE expression
+    | expression GTE expression
+    | expression EQ expression
+    | expression NEQ expression
+    | expression AND expression
+    | expression OR expression
+    | NOT expression
+    | THIS
+    | SUPER
+    | assignment
+    | IDENTIFIER PLUSPLUS
+    | IDENTIFIER MINUSMINUS
+        | NEW IDENTIFIER LPAREN argument_list RPAREN  // Création d'objet
+    ;
+
+assignment:
+    IDENTIFIER ASSIGN expression
+    | IDENTIFIER PLUS_ASSIGN expression
+    | IDENTIFIER MINUS_ASSIGN expression
+    | IDENTIFIER TIMES_ASSIGN expression
+    | IDENTIFIER DIVIDE_ASSIGN expression
+    | array_access ASSIGN expression
+    | array_access PLUS_ASSIGN expression
+    | array_access MINUS_ASSIGN expression
+    | array_access TIMES_ASSIGN expression
+    | array_access DIVIDE_ASSIGN expression
     ;
 
 array_creation:
@@ -190,6 +232,26 @@ expression_list:
 
 method_invocation:
     IDENTIFIER LPAREN argument_list RPAREN
+    | qualified_access LPAREN argument_list RPAREN
+    | PRIMARY DOT IDENTIFIER LPAREN argument_list RPAREN
+    ;
+
+qualified_access:
+    IDENTIFIER DOT IDENTIFIER
+    | qualified_access DOT IDENTIFIER
+    | SYSTEM DOT OUT DOT PRINTLN
+    ;
+
+PRIMARY:
+    THIS
+    | SUPER
+    | INTEGER_LITERAL
+    | FLOAT_LITERAL
+    | CHAR_LITERAL
+    | STRING_LITERAL
+    | BOOLEAN_LITERAL
+    | NEW array_creation
+    | LPAREN expression RPAREN
     ;
 
 argument_list:
@@ -197,32 +259,129 @@ argument_list:
     | expression
     | argument_list COMMA expression
     ;
-param_list:
-    type IDENTIFIER
-    | param_list COMMA type IDENTIFIER
-    ;
+
 method_body:
     LBRACE RBRACE
-    | LBRACE statement_list RBRACE
+    | LBRACE statements RBRACE
     ;
 
 constructor_body:
     LBRACE RBRACE
-    | LBRACE statement_list RBRACE
+    | LBRACE statements RBRACE
     ;
 
-statement_list: 
+statements:
     statement
-    | statement_list statement
+    | statements statement
     ;
 
 statement:
     expression SEMICOLON
-    | type IDENTIFIER SEMICOLON
-    | type IDENTIFIER ASSIGN expression SEMICOLON
+    | declaration SEMICOLON
     | SEMICOLON
-    | IDENTIFIER ASSIGN array_init SEMICOLON
-    | array_access ASSIGN expression SEMICOLON
+    | block
+    | if_statement
+    | for_statement
+    | enhanced_for_statement
+    | while_statement
+    | switch_statement
+    | try_statement
+    | RETURN expression SEMICOLON
+    | RETURN SEMICOLON
+    | BREAK SEMICOLON
+    | CONTINUE SEMICOLON
+    | PRINTLN LPAREN println_args RPAREN SEMICOLON
+    ;
+
+declaration:
+    type IDENTIFIER
+    | type IDENTIFIER ASSIGN expression
+    | type IDENTIFIER LBRACKET RBRACKET
+    | type IDENTIFIER LBRACKET RBRACKET ASSIGN array_init
+        | type IDENTIFIER ASSIGN NEW IDENTIFIER LPAREN argument_list RPAREN  // Ajout pour les constructeurs
+    ;
+
+block:
+    LBRACE statements RBRACE
+    ;
+
+if_statement:
+    IF LPAREN expression RPAREN statement
+    | IF LPAREN expression RPAREN statement ELSE statement
+    ;
+
+for_statement:
+    FOR LPAREN for_init_opt SEMICOLON for_cond_opt SEMICOLON for_update_opt RPAREN statement
+    ;
+
+enhanced_for_statement:
+    FOR LPAREN type IDENTIFIER COLON expression RPAREN statement
+    ;
+
+for_init_opt:
+    /* empty */
+    | for_init
+    ;
+
+for_init:
+    declaration
+    | expression_list
+    ;
+
+for_cond_opt:
+    /* empty */
+    | expression
+    ;
+
+for_update_opt:
+    /* empty */
+    | expression_list
+    ;
+
+while_statement:
+    WHILE LPAREN expression RPAREN statement
+    ;
+
+switch_statement:
+    SWITCH LPAREN expression RPAREN switch_block
+    ;
+
+switch_block:
+    LBRACE switch_cases RBRACE
+    ;
+
+switch_cases:
+    /* empty */
+    | switch_cases switch_case
+    ;
+
+switch_case:
+    CASE expression COLON statements
+    | DEFAULT COLON statements
+    ;
+
+try_statement:
+    TRY block catch_clauses finally_clause_opt
+    ;
+
+catch_clauses:
+    catch_clause
+    | catch_clauses catch_clause
+    ;
+
+catch_clause:
+    CATCH LPAREN type IDENTIFIER RPAREN block
+    ;
+
+finally_clause_opt:
+    /* empty */
+    | FINALLY block
+    ;
+
+println_args:
+    /* empty */
+    | expression
+    | println_args COMMA expression
     ;
 
 %%

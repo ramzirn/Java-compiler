@@ -34,6 +34,7 @@ extern int yylineno;
 "catch"        { return CATCH; }
 "finally"      { return FINALLY; }
 "System.out.println" { return PRINTLN; }
+
 "true"         { return BOOLEAN_LITERAL; }
 "false"        { return BOOLEAN_LITERAL; }
 "null"         { return NULL_LITERAL; }
@@ -76,6 +77,10 @@ extern int yylineno;
 "."            { return DOT; }
 ":"            { return COLON; }
 "?"            { return QUESTION; }
+"+="    { return PLUS_ASSIGN; }
+"-="    { return MINUS_ASSIGN; }
+"*="    { return TIMES_ASSIGN; }
+"/="    { return DIVIDE_ASSIGN; }
 
 [0-9]+         { yylval.num = atoi(yytext); return INTEGER_LITERAL; }
 [0-9]+\.[0-9]+ { yylval.dbl = atof(yytext); return FLOAT_LITERAL; }
