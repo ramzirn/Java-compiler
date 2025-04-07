@@ -34,7 +34,8 @@ extern int yylineno;
 "catch"        { return CATCH; }
 "finally"      { return FINALLY; }
 "System.out.println" { return PRINTLN; }
-
+"System.out.print"   { return PRINT; }
+"length"    { return LENGTH; }
 "true"         { return BOOLEAN_LITERAL; }
 "false"        { return BOOLEAN_LITERAL; }
 "null"         { return NULL_LITERAL; }
@@ -87,7 +88,6 @@ extern int yylineno;
 \"[^"\n]*\"  { yylval.str = strdup(yytext); return STRING_LITERAL; }
 \'[^'\n]\'   { yylval.chr = yytext[1]; return CHAR_LITERAL; }
 [a-zA-Z_][a-zA-Z0-9_]* { yylval.str = strdup(yytext); return IDENTIFIER; }
-"("[ \t]*"int"[ \t]*")"    { return CAST; }  // Capture (int)
 
 [ \t\r]+       ;
 \n             ;

@@ -28,18 +28,19 @@ void yyerror(const char *s) {
 %token PLUS MINUS TIMES DIVIDE ASSIGN PLUS_ASSIGN MINUS_ASSIGN TIMES_ASSIGN DIVIDE_ASSIGN
 %token EQ NEQ LT GT LTE GTE AND OR NOT
 %token INTEGER_LITERAL FLOAT_LITERAL STRING_LITERAL CHAR_LITERAL BOOLEAN_LITERAL IDENTIFIER
-%token PRIVATE PROTECTED FINAL CAST
-%token SYSTEM OUT PRINTLN
+%token PRIVATE PROTECTED FINAL 
+%token SYSTEM OUT PRINTLN PRINT
+%token LENGTH
 
 %left OR
 %left AND
 %left EQ NEQ
 %left LT GT LTE GTE
 %left PLUS MINUS
+%right CAST
 %left TIMES DIVIDE
 %right NOT
 %nonassoc UMINUS
-%right CAST
 %right ASSIGN PLUS_ASSIGN MINUS_ASSIGN TIMES_ASSIGN DIVIDE_ASSIGN
 
 %start program
@@ -152,23 +153,33 @@ type:
     | IDENTIFIER
     | type LBRACKET RBRACKET
     ;
-
-expression:
+primary_expression:
     IDENTIFIER
     | INTEGER_LITERAL
     | FLOAT_LITERAL
     | STRING_LITERAL
     | CHAR_LITERAL
     | BOOLEAN_LITERAL
+    | THIS
+    | SUPER
+    | NEW array_creation
+    | LPAREN expression RPAREN
+    | IDENTIFIER DOT LENGTH
+    | IDENTIFIER DOT IDENTIFIER
+    | CAST LPAREN type RPAREN primary_expression %prec CAST
+        | IDENTIFIER DOT IDENTIFIER LPAREN argument_list RPAREN  // <-- Ajout ici
+    ;
+cast_expression:
+    unary_expression
+    | CAST LPAREN type RPAREN cast_expression %prec CAST
+    ;
+
+expression:
+    cast_expression
     | expression PLUS expression
     | expression MINUS expression
     | expression TIMES expression
     | expression DIVIDE expression
-    | LPAREN expression RPAREN
-    | CAST LPAREN type RPAREN expression
-    | NEW array_creation
-    | array_access
-    | method_invocation
     | expression GT expression
     | expression LT expression
     | expression LTE expression
@@ -178,13 +189,28 @@ expression:
     | expression AND expression
     | expression OR expression
     | NOT expression
-    | THIS
-    | SUPER
     | assignment
     | IDENTIFIER PLUSPLUS
     | IDENTIFIER MINUSMINUS
-        | NEW IDENTIFIER LPAREN argument_list RPAREN  // Création d'objet
+    | NEW IDENTIFIER LPAREN argument_list RPAREN
+    | LPAREN type RPAREN expression %prec CAST
+    | IDENTIFIER DOT IDENTIFIER LPAREN argument_list RPAREN  // <-- Ajout ici
     ;
+
+
+unary_expression:
+    postfix_expression
+    | MINUS unary_expression %prec UMINUS
+    | NOT unary_expression
+    ;
+
+postfix_expression:
+    primary_expression
+    | postfix_expression LBRACKET expression RBRACKET
+    | postfix_expression DOT LENGTH
+    | postfix_expression DOT IDENTIFIER LPAREN argument_list RPAREN  // <-- Ajout ici
+    ;
+
 
 assignment:
     IDENTIFIER ASSIGN expression
@@ -197,6 +223,11 @@ assignment:
     | array_access MINUS_ASSIGN expression
     | array_access TIMES_ASSIGN expression
     | array_access DIVIDE_ASSIGN expression
+        | THIS DOT IDENTIFIER ASSIGN expression
+    | THIS DOT IDENTIFIER PLUS_ASSIGN expression
+    | THIS DOT IDENTIFIER MINUS_ASSIGN expression
+    | THIS DOT IDENTIFIER TIMES_ASSIGN expression
+    | THIS DOT IDENTIFIER DIVIDE_ASSIGN expression
     ;
 
 array_creation:
@@ -234,8 +265,7 @@ method_invocation:
     IDENTIFIER LPAREN argument_list RPAREN
     | qualified_access LPAREN argument_list RPAREN
     | PRIMARY DOT IDENTIFIER LPAREN argument_list RPAREN
-    ;
-
+;
 qualified_access:
     IDENTIFIER DOT IDENTIFIER
     | qualified_access DOT IDENTIFIER
@@ -291,6 +321,8 @@ statement:
     | BREAK SEMICOLON
     | CONTINUE SEMICOLON
     | PRINTLN LPAREN println_args RPAREN SEMICOLON
+        | PRINT LPAREN println_args RPAREN SEMICOLON
+    ;
     ;
 
 declaration:
@@ -299,6 +331,8 @@ declaration:
     | type IDENTIFIER LBRACKET RBRACKET
     | type IDENTIFIER LBRACKET RBRACKET ASSIGN array_init
         | type IDENTIFIER ASSIGN NEW IDENTIFIER LPAREN argument_list RPAREN  // Ajout pour les constructeurs
+    | type IDENTIFIER ASSIGN array_initializer
+
     ;
 
 block:

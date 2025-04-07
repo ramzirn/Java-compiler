@@ -80,7 +80,7 @@ class Main {
         // Gestion des exceptions avec le type d'exception précisé
         try {
             int result = 10 / 0; // Division par zéro
-        } catch (ArithmeticException e) {
+        }  catch (ArithmeticException e) {
             System.out.println("An error occurred: " + e.getMessage());
         } finally {
             System.out.println("Execution completed.");
