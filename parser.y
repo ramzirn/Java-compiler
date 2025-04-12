@@ -1,4 +1,5 @@
 %{
+#include "symbol_table.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,6 +8,7 @@ extern int yylex();
 extern int yyparse();
 extern FILE *yyin;
 extern int yylineno;
+SymbolTable symbol_table;
 
 void yyerror(const char *s) {
     fprintf(stderr, "Erreur syntaxique ligne %d: %s\n", yylineno, s);
@@ -42,6 +44,9 @@ void yyerror(const char *s) {
 %right NOT
 %nonassoc UMINUS
 %right ASSIGN PLUS_ASSIGN MINUS_ASSIGN TIMES_ASSIGN DIVIDE_ASSIGN
+
+%type <str> IDENTIFIER
+%type <num> type
 
 %start program
 
@@ -105,12 +110,27 @@ class_member:
     ;
 
 field_decl:
-    modifiers type IDENTIFIER SEMICOLON
-    | modifiers type IDENTIFIER ASSIGN expression SEMICOLON
-    | modifiers type IDENTIFIER LBRACKET RBRACKET SEMICOLON
-    | modifiers type IDENTIFIER LBRACKET RBRACKET ASSIGN array_init SEMICOLON
-    | modifiers type IDENTIFIER ASSIGN array_init SEMICOLON
-    ;
+    modifiers type IDENTIFIER SEMICOLON {
+        printf("Règle field_decl atteinte: nom = %s, type = %d\n", $3, $2);
+        symbol_insert(&symbol_table, $3, SYM_VARIABLE, $2, 0, 0, NULL);
+    }
+  | modifiers type IDENTIFIER ASSIGN expression SEMICOLON {
+        printf("Règle field_decl avec initialisation: nom = %s, type = %d\n", $3, $2);
+        symbol_insert(&symbol_table, $3, SYM_VARIABLE, $2, 0, 0, NULL);
+    }
+  | modifiers type IDENTIFIER LBRACKET RBRACKET SEMICOLON {
+        printf("Règle field_decl tableau: nom = %s, type = tableau de %d\n", $3, $2);
+        symbol_insert(&symbol_table, $3, SYM_VARIABLE, TYPE_ARRAY, 0, 0, NULL);
+    }
+  | modifiers type IDENTIFIER LBRACKET RBRACKET ASSIGN array_init SEMICOLON {
+        printf("Règle field_decl tableau initialisé: nom = %s, type = tableau de %d\n", $3, $2);
+        symbol_insert(&symbol_table, $3, SYM_VARIABLE, TYPE_ARRAY, 0, 0, NULL);
+    }
+  | modifiers type IDENTIFIER ASSIGN array_init SEMICOLON {
+        printf("Règle field_decl tableau (sans []) avec init: nom = %s, type = tableau de %d\n", $3, $2);
+        symbol_insert(&symbol_table, $3, SYM_VARIABLE, TYPE_ARRAY, 0, 0, NULL);
+    }
+  ;
 
 method_decl:
     modifiers type IDENTIFIER LPAREN param_list_opt RPAREN method_body
@@ -144,15 +164,16 @@ modifier:
     ;
 
 type:
-    INT
-    | DOUBLE
-    | CHAR
-    | BOOLEAN
-    | STRING
-    | VOID
-    | IDENTIFIER
-    | type LBRACKET RBRACKET
-    ;
+    INT { $$ = TYPE_INT; }
+  | DOUBLE { $$ = TYPE_DOUBLE; }
+  | CHAR { $$ = TYPE_CHAR; }
+  | BOOLEAN { $$ = TYPE_BOOLEAN; }
+  | STRING { $$ = TYPE_STRING; }
+  | VOID { $$ = TYPE_VOID; }
+  | IDENTIFIER { $$ = TYPE_IDENTIFIER; } 
+  | type LBRACKET RBRACKET { $$ = TYPE_ARRAY; }
+  ;
+
 primary_expression:
     IDENTIFIER
     | INTEGER_LITERAL
@@ -166,12 +187,13 @@ primary_expression:
     | LPAREN expression RPAREN
     | IDENTIFIER DOT LENGTH
     | IDENTIFIER DOT IDENTIFIER
-    | CAST LPAREN type RPAREN primary_expression %prec CAST
-        | IDENTIFIER DOT IDENTIFIER LPAREN argument_list RPAREN  // <-- Ajout ici
+    | CAST LPAREN type RPAREN primary_expression
+    | IDENTIFIER DOT IDENTIFIER LPAREN argument_list RPAREN
     ;
+
 cast_expression:
     unary_expression
-    | CAST LPAREN type RPAREN cast_expression %prec CAST
+    | CAST LPAREN type RPAREN cast_expression
     ;
 
 expression:
@@ -193,14 +215,13 @@ expression:
     | IDENTIFIER PLUSPLUS
     | IDENTIFIER MINUSMINUS
     | NEW IDENTIFIER LPAREN argument_list RPAREN
-    | LPAREN type RPAREN expression %prec CAST
-    | IDENTIFIER DOT IDENTIFIER LPAREN argument_list RPAREN  // <-- Ajout ici
+    | LPAREN type RPAREN expression
+    | IDENTIFIER DOT IDENTIFIER LPAREN argument_list RPAREN
     ;
-
 
 unary_expression:
     postfix_expression
-    | MINUS unary_expression %prec UMINUS
+    | MINUS unary_expression
     | NOT unary_expression
     ;
 
@@ -208,9 +229,8 @@ postfix_expression:
     primary_expression
     | postfix_expression LBRACKET expression RBRACKET
     | postfix_expression DOT LENGTH
-    | postfix_expression DOT IDENTIFIER LPAREN argument_list RPAREN  // <-- Ajout ici
+    | postfix_expression DOT IDENTIFIER LPAREN argument_list RPAREN
     ;
-
 
 assignment:
     IDENTIFIER ASSIGN expression
@@ -223,7 +243,7 @@ assignment:
     | array_access MINUS_ASSIGN expression
     | array_access TIMES_ASSIGN expression
     | array_access DIVIDE_ASSIGN expression
-        | THIS DOT IDENTIFIER ASSIGN expression
+    | THIS DOT IDENTIFIER ASSIGN expression
     | THIS DOT IDENTIFIER PLUS_ASSIGN expression
     | THIS DOT IDENTIFIER MINUS_ASSIGN expression
     | THIS DOT IDENTIFIER TIMES_ASSIGN expression
@@ -265,7 +285,8 @@ method_invocation:
     IDENTIFIER LPAREN argument_list RPAREN
     | qualified_access LPAREN argument_list RPAREN
     | PRIMARY DOT IDENTIFIER LPAREN argument_list RPAREN
-;
+    ;
+
 qualified_access:
     IDENTIFIER DOT IDENTIFIER
     | qualified_access DOT IDENTIFIER
@@ -321,8 +342,7 @@ statement:
     | BREAK SEMICOLON
     | CONTINUE SEMICOLON
     | PRINTLN LPAREN println_args RPAREN SEMICOLON
-        | PRINT LPAREN println_args RPAREN SEMICOLON
-    ;
+    | PRINT LPAREN println_args RPAREN SEMICOLON
     ;
 
 declaration:
@@ -330,9 +350,8 @@ declaration:
     | type IDENTIFIER ASSIGN expression
     | type IDENTIFIER LBRACKET RBRACKET
     | type IDENTIFIER LBRACKET RBRACKET ASSIGN array_init
-        | type IDENTIFIER ASSIGN NEW IDENTIFIER LPAREN argument_list RPAREN  // Ajout pour les constructeurs
+    | type IDENTIFIER ASSIGN NEW IDENTIFIER LPAREN argument_list RPAREN
     | type IDENTIFIER ASSIGN array_initializer
-
     ;
 
 block:
@@ -420,15 +439,25 @@ println_args:
 
 %%
 
-int main(int argc, char** argv) {
-    if (argc < 2) {
-        fprintf(stderr, "Usage: %s <fichier.java>\n", argv[0]);
+int main(int argc, char *argv[]) {
+    init_symbol_table(&symbol_table);
+    printf("Début du parsing\n");
+
+    if (argc > 1) {
+        FILE *source_code = fopen(argv[1], "r");
+        if (!source_code) {
+            fprintf(stderr, "Impossible d'ouvrir le fichier %s\n", argv[1]);
+            return 1;
+        }
+
+        yyin = source_code;
+        yyparse();
+        fclose(source_code);
+    } else {
+        fprintf(stderr, "Usage: %s <fichier_source>\n", argv[0]);
         return 1;
     }
-    yyin = fopen(argv[1], "r");
-    if (!yyin) {
-        perror("Erreur ouverture fichier");
-        return 1;
-    }
-    return yyparse();
+
+    print_symbol_table(&symbol_table);
+    return 0;
 }

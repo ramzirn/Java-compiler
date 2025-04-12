@@ -18,16 +18,21 @@ BISON_GEN = parser.tab.c parser.tab.h
 # Cible par défaut
 all: $(TARGET)
 
-# Règles de génération
+# Génération du scanner avec Flex
 $(LEX_GEN): $(LEX_SRC)
 	$(FLEX) $<
 
+# Génération du parseur avec Bison
 $(BISON_GEN): $(BISON_SRC)
 	$(BISON) -d $<
 
-# Compilation
-$(TARGET): $(LEX_GEN) $(BISON_GEN)
-	$(CC) $(CFLAGS) -o $@ $(LEX_GEN) $(BISON_GEN) -lfl
+# Compilation finale (avec symbol_table.c)
+$(TARGET): $(LEX_GEN) $(BISON_GEN) symbol_table.c
+	$(CC) $(CFLAGS) -o $@ $(LEX_GEN) $(BISON_GEN) symbol_table.c -lfl
+
+# Cible spécifique pour forcer une recompilation complète
+build: $(LEX_GEN) $(BISON_GEN) symbol_table.c
+	$(CC) $(CFLAGS) -o $(TARGET) $(LEX_GEN) $(BISON_GEN) symbol_table.c -lfl
 
 # Test (ne rebuild que si nécessaire)
 test: $(TARGET)
@@ -37,4 +42,4 @@ test: $(TARGET)
 clean:
 	rm -f $(LEX_GEN) $(BISON_GEN) $(TARGET) $(EXEC)
 
-.PHONY: all test clean
+.PHONY: all build test clean

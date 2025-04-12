@@ -1,9 +1,10 @@
 /* Fichier Flex corrigé */
 %{
+    #include "symbol_table.h"
 #include "parser.tab.h"
 #include <stdlib.h>
 #include <string.h>
-
+extern SymbolTable symbol_table;  // 👈 on dit "cette variable existe ailleurs"
 #define YY_NO_UNPUT
 extern int yylineno;
 %}
@@ -18,8 +19,8 @@ extern int yylineno;
 "class"        { return CLASS; }
 "static"       { return STATIC; }
 "void"         { return VOID; }
-"int"          { return INT; }
-"double"       { return DOUBLE; }
+"int"          { printf("Found int\n"); return INT; }
+"double"       { printf("Found double\n"); return DOUBLE; }
 "String"       { return STRING; }
 "char"         { return CHAR; }
 "boolean"      { return BOOLEAN; }
@@ -87,7 +88,11 @@ extern int yylineno;
 [0-9]+\.[0-9]+ { yylval.dbl = atof(yytext); return FLOAT_LITERAL; }
 \"[^"\n]*\"  { yylval.str = strdup(yytext); return STRING_LITERAL; }
 \'[^'\n]\'   { yylval.chr = yytext[1]; return CHAR_LITERAL; }
-[a-zA-Z_][a-zA-Z0-9_]* { yylval.str = strdup(yytext); return IDENTIFIER; }
+[a-zA-Z_][a-zA-Z0-9_]* {
+    yylval.str = strdup(yytext);
+    return IDENTIFIER;
+}
+
 
 [ \t\r]+       ;
 \n             ;
