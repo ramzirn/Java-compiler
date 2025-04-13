@@ -19,7 +19,7 @@ extern int yylineno;
 "class"        { return CLASS; }
 "static"       { return STATIC; }
 "void"         { return VOID; }
-"int"          { printf("Found int\n"); return INT; }
+"int"     { printf(">> TOKEN: int\n"); return INT; }
 "double"       { printf("Found double\n"); return DOUBLE; }
 "String"       { return STRING; }
 "char"         { return CHAR; }

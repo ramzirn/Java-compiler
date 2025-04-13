@@ -20,6 +20,20 @@ unsigned int hash(const char *name) {
     return hashval % SYMBOL_TABLE_SIZE;
 }
 
+
+Symbol *symbol_insert_function(SymbolTable *st, const char *name, 
+    DataType return_type, int param_count, 
+    char **param_names, DataType *param_types) {
+Symbol *s = symbol_insert(st, name, SYM_FUNCTION, return_type, 0, -1, NULL);
+if (s == NULL) return NULL;
+
+s->param_count = param_count;
+s->param_names = param_names;
+s->param_types = param_types;
+
+return s;
+}
+
 // Recherche d'un symbole dans la table
 Symbol *symbol_lookup(SymbolTable *st, const char *name, int current_scope) {
     unsigned int hashval = hash(name);
@@ -128,11 +142,33 @@ void print_symbol_table(SymbolTable *st) {
                 case TYPE_ARRAY: data_type_str = "array"; break;
                 default: data_type_str = "inconnu"; break;
             }
-            
+
+            // Afficher les symboles classiques
             printf("%-20s %-12s %-12s %-8d %-10s %-8d %-10s\n", 
                    s->name, sym_type_str, data_type_str, s->scope_level,
                    s->is_constant ? "oui" : "non", s->array_size,
                    s->class_name ? s->class_name : "-");
+            
+            // Si c'est une fonction, afficher les paramètres associés
+            if (s->sym_type == SYM_FUNCTION && s->param_names != NULL) {
+                for (int i = 0; i < s->param_count; i++) {
+                    const char *param_data_type_str;
+                    switch (s->param_types[i]) {
+                        case TYPE_INT: param_data_type_str = "int"; break;
+                        case TYPE_DOUBLE: param_data_type_str = "double"; break;
+                        case TYPE_CHAR: param_data_type_str = "char"; break;
+                        case TYPE_BOOLEAN: param_data_type_str = "boolean"; break;
+                        case TYPE_STRING: param_data_type_str = "String"; break;
+                        case TYPE_VOID: param_data_type_str = "void"; break;
+                        case TYPE_CLASS: param_data_type_str = s->class_name ? s->class_name : "class"; break;
+                        case TYPE_ARRAY: param_data_type_str = "array"; break;
+                        default: param_data_type_str = "inconnu"; break;
+                    }
+                    printf("%-20s %-12s %-12s %-8d %-10s %-8d %-10s (Paramètre de Fonction)\n",
+                           s->param_names[i], "Parametre", param_data_type_str, s->scope_level + 1,
+                           "non", -1, "-");
+                }
+            }
             
             s = s->next;
         }
@@ -143,10 +179,13 @@ void print_symbol_table(SymbolTable *st) {
 // Entrée dans un nouveau scope
 void enter_scope(SymbolTable *st) {
     st->current_scope++;
+printf("enter");
 }
 
 // Sortie du scope courant
 void exit_scope(SymbolTable *st) {
+    printf("exit");
+
     // Suppression de tous les symboles du scope courant
     for (int i = 0; i < SYMBOL_TABLE_SIZE; i++) {
         Symbol *prev = NULL;

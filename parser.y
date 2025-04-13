@@ -14,12 +14,19 @@ void yyerror(const char *s) {
     fprintf(stderr, "Erreur syntaxique ligne %d: %s\n", yylineno, s);
 }
 %}
-
+%code requires {
+    #include "symbol_table.h"
+}
 %union {
     char* str;
     int num;
     double dbl;
     char chr;
+     struct {
+        int count;
+        char **names;
+        DataType *types;
+    } param_list;
 }
 
 %token NULL_LITERAL PLUSPLUS MINUSMINUS QUESTION
@@ -47,6 +54,7 @@ void yyerror(const char *s) {
 
 %type <str> IDENTIFIER
 %type <num> type
+%type <param_list> param_list param_list_opt
 
 %start program
 
@@ -133,18 +141,48 @@ field_decl:
   ;
 
 method_decl:
-    modifiers type IDENTIFIER LPAREN param_list_opt RPAREN method_body
-    ;
+    modifiers type IDENTIFIER LPAREN param_list_opt RPAREN method_body {
+        printf("Déclaration de fonction: nom = %s, type retour = %d, nb params = %d\n", $3, $2, $5.count);
+        symbol_insert_function(&symbol_table, $3, $2, $5.count, $5.names, $5.types);
+        
+        // Entrez dans le scope de la fonction
+        enter_scope(&symbol_table);
+
+        // Insère les paramètres comme variables locales
+        for (int i = 0; i < $5.count; ++i) {
+            symbol_insert(&symbol_table, $5.names[i], SYM_VARIABLE, $5.types[i], 0, 0, NULL);
+        }
+
+        // Le corps de la méthode a déjà été géré par method_body
+        exit_scope(&symbol_table);  // ou place-le ailleurs selon ta logique de blocs
+    }
 
 param_list_opt:
-    /* empty */
-    | param_list
-    ;
+    /* empty */ {
+        $$.count = 0;
+        $$.names = NULL;
+        $$.types = NULL;
+    }
+  | param_list { $$ = $1; }
+
 
 param_list:
-    type IDENTIFIER
-    | param_list COMMA type IDENTIFIER
-    ;
+    type IDENTIFIER {
+        $$ = (typeof($$)){ .count = 1 };
+        $$ .names = malloc(sizeof(char*));
+        $$ .types = malloc(sizeof(DataType));
+        $$ .names[0] = strdup($2);
+        $$ .types[0] = $1;
+    }
+  | param_list COMMA type IDENTIFIER {
+        $$ = $1;
+        $$ .count++;
+        $$ .names = realloc($$.names, $$ .count * sizeof(char*));
+        $$ .types = realloc($$.types, $$ .count * sizeof(DataType));
+        $$ .names[$$.count - 1] = strdup($4);
+        $$ .types[$$.count - 1] = $3;
+    }
+
 
 constructor_decl:
     modifiers IDENTIFIER LPAREN param_list RPAREN constructor_body
@@ -355,9 +393,12 @@ declaration:
     ;
 
 block:
-    LBRACE statements RBRACE
-    ;
-
+    LBRACE statements RBRACE {
+        enter_scope(&symbol_table);  // Entrée dans un scope interne
+        // Traite toutes les déclarations dans le bloc
+        exit_scope(&symbol_table);  // Sortie du scope du bloc
+    }
+;
 if_statement:
     IF LPAREN expression RPAREN statement
     | IF LPAREN expression RPAREN statement ELSE statement

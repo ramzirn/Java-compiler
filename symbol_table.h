@@ -41,6 +41,9 @@ typedef struct Symbol {
     int array_size;         // Taille si c'est un tableau
     char *class_name;       // Nom de la classe si c'est un membre
     struct Symbol *next;    // Pour la gestion des collisions
+    int param_count;
+char **param_names;
+DataType *param_types;
 } Symbol;
 
 // Structure représentant la table des symboles
@@ -60,5 +63,5 @@ void symbol_remove(SymbolTable *st, const char *name);
 void print_symbol_table(SymbolTable *st);
 void enter_scope(SymbolTable *st);
 void exit_scope(SymbolTable *st);
-
+Symbol *symbol_insert_function(SymbolTable *st, const char *name, DataType return_type, int param_count, char **param_names, DataType *param_types);
 #endif // SYMBOL_TABLE_H
