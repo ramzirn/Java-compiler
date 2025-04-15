@@ -1,0 +1,11 @@
+Erreurs sémantiques à traiter: 
+ - Variable double déclarée , DONE 
+ - Variable non déclarée 
+ - Incompatibilité de type 
+ - Division par zéro 
+ - Tableau  (taille invalide) 
+ - Tableau (type d'element invalide) 
+ - Tableau  (accès à de mauvais indices dans un tableau) 
+ - Méthode (nombre et type de paramètres invalides) 
+ - Méthode (type de retour invalide) 
+ - Portée des paramètres et variables locales des méthodes 
