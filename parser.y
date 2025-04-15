@@ -141,21 +141,28 @@ field_decl:
   ;
 
 method_decl:
-    modifiers type IDENTIFIER LPAREN param_list_opt RPAREN method_body {
+    modifiers type IDENTIFIER LPAREN param_list_opt RPAREN {
         printf("Déclaration de fonction: nom = %s, type retour = %d, nb params = %d\n", $3, $2, $5.count);
+        
+        // Insérer la fonction dans le scope actuel (généralement global)
         symbol_insert_function(&symbol_table, $3, $2, $5.count, $5.names, $5.types);
         
-        // Entrez dans le scope de la fonction
+        // Entrer dans le scope de la fonction
         enter_scope(&symbol_table);
 
-        // Insère les paramètres comme variables locales
+        // Insérer les paramètres comme variables locales dans ce scope
         for (int i = 0; i < $5.count; ++i) {
-            symbol_insert(&symbol_table, $5.names[i], SYM_VARIABLE, $5.types[i], 0, 0, NULL);
+            Symbol *inserted = symbol_insert(&symbol_table, $5.names[i], SYM_VARIABLE, $5.types[i], 0, 0, NULL);
+            if (inserted) {
+                printf("Paramètre inséré : %s (Scope %d)\n", $5.names[i], symbol_table.current_scope);
+            }
         }
-
-        // Le corps de la méthode a déjà été géré par method_body
-        exit_scope(&symbol_table);  // ou place-le ailleurs selon ta logique de blocs
     }
+    method_body {
+        // Sortie du scope de la fonction
+        exit_scope(&symbol_table);
+    }
+;
 
 param_list_opt:
     /* empty */ {
