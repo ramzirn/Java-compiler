@@ -57,8 +57,10 @@ Symbol *symbol_insert(SymbolTable *st, const char *name, SymbolType sym_type,
     // Vérifier si le symbole existe déjà dans le scope courant
     Symbol *s = symbol_lookup(st, name, st->current_scope);
     if (s != NULL && s->scope_level == st->current_scope) {
-        return NULL; // Erreur: symbole déjà déclaré dans ce scope
+        fprintf(stderr, "Erreur sémantique : la variable '%s' est déjà déclarée dans le scope %d\n", name, st->current_scope);
+        return NULL;
     }
+    
     
     // Allocation du nouveau symbole
     Symbol *new_sym = (Symbol *)malloc(sizeof(Symbol));
