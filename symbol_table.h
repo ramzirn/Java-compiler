@@ -65,4 +65,6 @@ void print_symbol_table(SymbolTable *st);
 void enter_scope(SymbolTable *st);
 void exit_scope(SymbolTable *st);
 Symbol *symbol_insert_function(SymbolTable *st, const char *name, DataType return_type, int param_count, char **param_names, DataType *param_types);
+Symbol *symbol_lookup_all(SymbolTable *st, const char *name) ;
+
 #endif // SYMBOL_TABLE_H

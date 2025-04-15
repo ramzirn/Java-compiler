@@ -26,13 +26,13 @@ $(LEX_GEN): $(LEX_SRC)
 $(BISON_GEN): $(BISON_SRC)
 	$(BISON) -d $<
 
-# Compilation finale (avec symbol_table.c)
-$(TARGET): $(LEX_GEN) $(BISON_GEN) symbol_table.c
-	$(CC) $(CFLAGS) -o $@ $(LEX_GEN) $(BISON_GEN) symbol_table.c -lfl
+# Compilation finale (avec symbol_table.c et semantics.c)
+$(TARGET): $(LEX_GEN) $(BISON_GEN) symbol_table.c semantics.c
+	$(CC) $(CFLAGS) -o $@ $(LEX_GEN) $(BISON_GEN) symbol_table.c semantics.c -lfl
 
 # Cible spécifique pour forcer une recompilation complète
-build: $(LEX_GEN) $(BISON_GEN) symbol_table.c
-	$(CC) $(CFLAGS) -o $(TARGET) $(LEX_GEN) $(BISON_GEN) symbol_table.c -lfl
+build: $(LEX_GEN) $(BISON_GEN) symbol_table.c semantics.c
+	$(CC) $(CFLAGS) -o $(TARGET) $(LEX_GEN) $(BISON_GEN) symbol_table.c semantics.c -lfl
 
 # Test (ne rebuild que si nécessaire)
 test: $(TARGET)

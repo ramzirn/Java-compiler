@@ -1,6 +1,8 @@
 /* Fichier Flex corrigé */
 %{
     #include "symbol_table.h"
+    #include "semantics.h"
+
 #include "parser.tab.h"
 #include <stdlib.h>
 #include <string.h>

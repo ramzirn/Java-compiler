@@ -84,6 +84,15 @@ Symbol *symbol_insert(SymbolTable *st, const char *name, SymbolType sym_type,
     printf("Insertion: %s, Type: %d, Scope: %d\n", name, sym_type, st->current_scope);
     return new_sym;
 }
+Symbol *symbol_lookup_all(SymbolTable *st, const char *name) {
+    for (int scope = st->current_scope; scope >= 0; scope--) {
+        Symbol *s = symbol_lookup(st, name, scope);
+        if (s != NULL) {
+            return s;
+        }
+    }
+    return NULL; // Non trouvé dans aucun scope
+}
 
 // Suppression d'un symbole
 void symbol_remove(SymbolTable *st, const char *name) {
@@ -220,3 +229,6 @@ void exit_scope(SymbolTable *st) {
     
     st->current_scope--;
 }
+
+
+
