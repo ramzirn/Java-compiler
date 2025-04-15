@@ -28,6 +28,7 @@ typedef enum {
     TYPE_VOID,
     TYPE_CLASS,
     TYPE_ARRAY,
+    TYPE_OBJECT ,
     TYPE_IDENTIFIER, // Ajoute ceci si tu n'as pas déjà un type pour les identifiants
 } DataType;
 

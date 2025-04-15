@@ -381,16 +381,38 @@ statement:
     | CONTINUE SEMICOLON
     | PRINTLN LPAREN println_args RPAREN SEMICOLON
     | PRINT LPAREN println_args RPAREN SEMICOLON
+    
+    | IDENTIFIER LPAREN argument_list RPAREN SEMICOLON
+
     ;
 
 declaration:
-    type IDENTIFIER
-    | type IDENTIFIER ASSIGN expression
-    | type IDENTIFIER LBRACKET RBRACKET
-    | type IDENTIFIER LBRACKET RBRACKET ASSIGN array_init
-    | type IDENTIFIER ASSIGN NEW IDENTIFIER LPAREN argument_list RPAREN
-    | type IDENTIFIER ASSIGN array_initializer
+    type IDENTIFIER {  // Déclaration simple : type + nom de variable
+        printf("Déclaration variable locale : %s\n", $2);
+        symbol_insert(&symbol_table, $2, SYM_VARIABLE, $1, 0, 0, NULL);  // Insère la variable dans la table des symboles
+    }
+    | type IDENTIFIER ASSIGN expression {  // Déclaration avec assignation : type + nom + valeur
+        printf("Déclaration variable locale avec assignation : %s\n", $2);
+        symbol_insert(&symbol_table, $2, SYM_VARIABLE, $1, 0, 0, NULL);  // Insère la variable avec la valeur assignée
+    }
+    | type IDENTIFIER LBRACKET RBRACKET {  // Déclaration de tableau
+        printf("Déclaration tableau local : %s\n", $2);
+        symbol_insert(&symbol_table, $2, SYM_VARIABLE, TYPE_ARRAY, 0, 0, NULL);  // Insère un tableau dans la table des symboles
+    }
+    | type IDENTIFIER LBRACKET RBRACKET ASSIGN array_init {  // Déclaration de tableau avec initialisation
+        printf("Déclaration tableau local avec initialisation : %s\n", $2);
+        symbol_insert(&symbol_table, $2, SYM_VARIABLE, TYPE_ARRAY, 0, 0, NULL);  // Insère un tableau initialisé dans la table des symboles
+    }
+    | type IDENTIFIER ASSIGN NEW IDENTIFIER LPAREN argument_list RPAREN {  // Déclaration avec nouvel objet
+        printf("Déclaration variable avec instanciation d'objet : %s\n", $2);
+        symbol_insert(&symbol_table, $2, SYM_VARIABLE, TYPE_OBJECT, 0, 0, NULL);  // Insère un objet dans la table des symboles
+    }
+    | type IDENTIFIER ASSIGN array_initializer {  // Déclaration avec initialisation (tableau)
+        printf("Déclaration tableau avec initialisation : %s\n", $2);
+        symbol_insert(&symbol_table, $2, SYM_VARIABLE, TYPE_ARRAY, 0, 0, NULL);  // Insère un tableau initialisé dans la table des symboles
+    }
     ;
+
 
 block:
     LBRACE statements RBRACE {
