@@ -140,6 +140,8 @@ void print_symbol_table(SymbolTable *st) {
                 case TYPE_VOID: data_type_str = "void"; break;
                 case TYPE_CLASS: data_type_str = s->class_name ? s->class_name : "class"; break;
                 case TYPE_ARRAY: data_type_str = "array"; break;
+                case TYPE_OBJECT: data_type_str = "objet"; break;
+
                 default: data_type_str = "inconnu"; break;
             }
 
@@ -162,6 +164,8 @@ void print_symbol_table(SymbolTable *st) {
                         case TYPE_VOID: param_data_type_str = "void"; break;
                         case TYPE_CLASS: param_data_type_str = s->class_name ? s->class_name : "class"; break;
                         case TYPE_ARRAY: param_data_type_str = "array"; break;
+                        case TYPE_OBJECT: data_type_str = "objet"; break;
+
                         default: param_data_type_str = "inconnu"; break;
                     }
                     printf("%-20s %-12s %-12s %-8d %-10s %-8d %-10s (Paramètre de Fonction)\n",

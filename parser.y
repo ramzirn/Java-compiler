@@ -208,7 +208,7 @@ type:
   | BOOLEAN { $$ = TYPE_BOOLEAN; }
   | STRING { $$ = TYPE_STRING; }
   | VOID { $$ = TYPE_VOID; }
-  | IDENTIFIER { $$ = TYPE_IDENTIFIER; } 
+  | IDENTIFIER { $$ = TYPE_OBJECT; } 
   | type LBRACKET RBRACKET { $$ = TYPE_ARRAY; }
   ;
 
