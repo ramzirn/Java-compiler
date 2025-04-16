@@ -1,0 +1,15 @@
+Projet_compil_2025-1.pdf:Zone.Identifier
+example.java:Zone.Identifier
+lex.yy.c
+lexer
+test.java
+test.txt
+parser.tab.c
+parser.tab.h
+test
+javacompiler
+newtest.txt
+.gitignore.swp
+venv/
+.vscode/
+*:Zone.Identifier

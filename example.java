@@ -1,21 +1,40 @@
-class TestDoubleDeclaration {
-    int a;              // OK
-    int a;              // Erreur : redéclaration dans la même portée
-
-    void methode1() {
-        int b = 5;      // OK
-        int b = 6;      // Erreur : redéclaration dans la même portée
-    }
-
-    void methode2() {
-        int c = 10;     // OK
+public class TestVariablesNonDeclarees {
+    // Cas 1: Variable membre valide
+    int varMembre = 10;
+    
+    public static void main(String[] args) {
+        // Cas 2: Variable locale valide
+        int varLocale = 20;
+        System.out.println(varLocale); // OK
+        
+        // Cas 3: Variable non déclarée (doit échouer)
+        //System.out.println(varNonDeclaree); // Erreur attendue
+        
+        // Cas 4: Variable dans un bloc
         {
-            int c = 15; // OK : portée différente (bloc interne)
+            int varBloc = 30;
+            System.out.println(varBloc); // OK
         }
-        int c = 20;     // Erreur : redéclaration dans la même portée (methode2)
+        
+        // Cas 5: Utilisation hors scope (doit échouer)
+        //System.out.println(varBloc); // Erreur attendue
+        
+        // Cas 6: Shadowing valide
+        int x = 5;
+        {
+            int x = 10; // Shadowing autorisé
+            System.out.println(x); // Doit afficher 10
+        }
+        System.out.println(x); // Doit afficher 5
+        
+        // Cas 7: Paramètre de méthode
+        maMethode(15); // OK
     }
-
-    void methode3(int d, int d) { // Erreur : double déclaration des paramètres
-        int e;           // OK
+    
+    public static void maMethode(int param) {
+        System.out.println(param); // OK
+        
+        // Cas 8: Variable non déclarée dans méthode
+        //System.out.println(varNonDeclareeDansMethode); // Erreur attendue
     }
 }

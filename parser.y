@@ -52,10 +52,9 @@ void yyerror(const char *s) {
 %nonassoc UMINUS
 %right ASSIGN PLUS_ASSIGN MINUS_ASSIGN TIMES_ASSIGN DIVIDE_ASSIGN
 
-%type <str> IDENTIFIER
 %type <num> type
 %type <param_list> param_list param_list_opt
-
+%type <str> primary_expression IDENTIFIER STRING_LITERAL
 %start program
 
 %%
@@ -220,7 +219,12 @@ type:
   ;
 
 primary_expression:
-    IDENTIFIER
+    IDENTIFIER {
+        if (!check_variable_declared(&symbol_table, $1, yylineno)) {
+            YYERROR;
+        }
+        $$ = $1;
+    }
     | INTEGER_LITERAL
     | FLOAT_LITERAL
     | STRING_LITERAL
@@ -278,8 +282,11 @@ postfix_expression:
     ;
 
 assignment:
-    IDENTIFIER ASSIGN expression
-    | IDENTIFIER PLUS_ASSIGN expression
+ IDENTIFIER ASSIGN expression {
+        if (!check_variable_declared(&symbol_table, $1, yylineno)) {
+            YYERROR;
+        }
+    }    | IDENTIFIER PLUS_ASSIGN expression
     | IDENTIFIER MINUS_ASSIGN expression
     | IDENTIFIER TIMES_ASSIGN expression
     | IDENTIFIER DIVIDE_ASSIGN expression
@@ -390,6 +397,11 @@ statement:
     | PRINT LPAREN println_args RPAREN SEMICOLON
     
     | IDENTIFIER LPAREN argument_list RPAREN SEMICOLON
+      | IDENTIFIER ASSIGN expression SEMICOLON {
+        if (!check_variable_declared(&symbol_table, $1, yylineno)) {
+            YYERROR;
+        }
+    }
 
     ;
 
@@ -420,13 +432,10 @@ declaration:
     }
     ;
 
-
 block:
-    LBRACE statements RBRACE {
-        enter_scope(&symbol_table);  // Entrée dans un scope interne
-        // Traite toutes les déclarations dans le bloc
-        exit_scope(&symbol_table);  // Sortie du scope du bloc
-    }
+    LBRACE { enter_scope(&symbol_table); }
+    statements 
+    RBRACE { exit_scope(&symbol_table); }
 ;
 if_statement:
     IF LPAREN expression RPAREN statement
