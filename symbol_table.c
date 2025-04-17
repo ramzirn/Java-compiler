@@ -230,5 +230,33 @@ void exit_scope(SymbolTable *st) {
     st->current_scope--;
 }
 
+int get_type_of_identifier(SymbolTable* table, char* name) {
+    Symbol* sym = symbol_lookup(table, name, table->current_scope);  // Passage du niveau de scope actuel
+    if (!sym) {
+        fprintf(stderr, "Erreur sémantique : variable '%s' non déclarée.\n", name);
+        exit(1);
+    }
+    return sym->data_type;
+}
 
+
+// Fonction pour récupérer le type de retour d'une fonction à partir de la table des symboles
+// Fonction pour récupérer le type de retour d'une fonction à partir de la table des symboles
+int get_function_return_type(SymbolTable *symbol_table, const char *function_name) {
+    // Parcours de la table de symboles pour trouver la fonction
+    for (int i = 0; i < SYMBOL_TABLE_SIZE; i++) {
+        Symbol *s = symbol_table->table[i];  // Vérifie chaque "chaîne de collision"
+        while (s != NULL) {
+            if (strcmp(s->name, function_name) == 0 && s->sym_type == SYM_FUNCTION) {
+                // On retourne le type de la fonction (type de retour)
+                return s->data_type;
+            }
+            s = s->next;
+        }
+    }
+    
+    // Si la fonction n'est pas trouvée, on renvoie un code d'erreur
+    fprintf(stderr, "Erreur : fonction non déclarée %s\n", function_name);
+    return TYPE_UNKNOWN;  // Retourne un code pour "inconnu" si la fonction n'est pas trouvée
+}
 

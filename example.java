@@ -1,40 +1,22 @@
-public class TestVariablesNonDeclarees {
-    // Cas 1: Variable membre valide
-    int varMembre = 10;
-    
+public class TestTypes {
     public static void main(String[] args) {
-        // Cas 2: Variable locale valide
-        int varLocale = 20;
-        System.out.println(varLocale); // OK
+        int a = 10;
+        double b = 3.14;
+        String s = "Hello";
+
+        // Tentative d'addition d'un entier et d'une chaîne (incompatible)
+        //s = a + s; // Erreur : incompatible types: int cannot be converted to String
+
+        // Tentative d'affectation d'une chaîne à un entier (incompatible)
+        a = s; // Erreur : incompatible types: String cannot be converted to int
+
+        // Tentative de division d'un entier et d'une chaîne (incompatible)
+        int c = a / s; // Erreur : incompatible types: String cannot be converted to int
+
+        // Tentative d'addition d'un double et d'une chaîne (incompatible)
+        s = s + b; // Erreur potentielle si gestion stricte des types (en fonction de ton implémentation)
         
-        // Cas 3: Variable non déclarée (doit échouer)
-        //System.out.println(varNonDeclaree); // Erreur attendue
-        
-        // Cas 4: Variable dans un bloc
-        {
-            int varBloc = 30;
-            System.out.println(varBloc); // OK
-        }
-        
-        // Cas 5: Utilisation hors scope (doit échouer)
-        //System.out.println(varBloc); // Erreur attendue
-        
-        // Cas 6: Shadowing valide
-        int x = 5;
-        {
-            int x = 10; // Shadowing autorisé
-            System.out.println(x); // Doit afficher 10
-        }
-        System.out.println(x); // Doit afficher 5
-        
-        // Cas 7: Paramètre de méthode
-        maMethode(15); // OK
-    }
-    
-    public static void maMethode(int param) {
-        System.out.println(param); // OK
-        
-        // Cas 8: Variable non déclarée dans méthode
-        //System.out.println(varNonDeclareeDansMethode); // Erreur attendue
+        // Affichage du résultat
+        System.out.println(a);
     }
 }

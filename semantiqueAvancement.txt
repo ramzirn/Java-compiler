@@ -1,6 +1,6 @@
 Erreurs sémantiques à traiter: 
  - Variable double déclarée , DONE 
- - Variable non déclarée 
+ - Variable non déclarée . DONE but could be better 
  - Incompatibilité de type 
  - Division par zéro 
  - Tableau  (taille invalide) 
@@ -9,3 +9,4 @@ Erreurs sémantiques à traiter:
  - Méthode (nombre et type de paramètres invalides) 
  - Méthode (type de retour invalide) 
  - Portée des paramètres et variables locales des méthodes 
+ -ajouter print arrays 

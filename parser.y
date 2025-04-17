@@ -3,6 +3,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+int check_variable_declared(SymbolTable* table, char* name, int line);
+int check_type_compatibility(char* type1, char* type2);
+char* get_variable_type(SymbolTable* table, char* name);
+
 
 extern int yylex();
 extern int yyparse();
@@ -27,6 +31,11 @@ void yyerror(const char *s) {
         char **names;
         DataType *types;
     } param_list;
+
+      struct expr_attr {
+        char* type;
+    char* strval; // optionnel, utile pour garder le nom de la variable   
+     }expr;
 }
 
 %token NULL_LITERAL PLUSPLUS MINUSMINUS QUESTION
@@ -36,10 +45,11 @@ void yyerror(const char *s) {
 %token LBRACE RBRACE LPAREN RPAREN LBRACKET RBRACKET SEMICOLON COMMA DOT COLON STAR 
 %token PLUS MINUS TIMES DIVIDE ASSIGN PLUS_ASSIGN MINUS_ASSIGN TIMES_ASSIGN DIVIDE_ASSIGN
 %token EQ NEQ LT GT LTE GTE AND OR NOT
-%token INTEGER_LITERAL FLOAT_LITERAL STRING_LITERAL CHAR_LITERAL BOOLEAN_LITERAL IDENTIFIER
+%token INTEGER_LITERAL FLOAT_LITERAL  CHAR_LITERAL BOOLEAN_LITERAL IDENTIFIER
 %token PRIVATE PROTECTED FINAL 
 %token SYSTEM OUT PRINTLN PRINT
 %token LENGTH
+%token <str> STRING_LITERAL
 
 %left OR
 %left AND
@@ -54,7 +64,9 @@ void yyerror(const char *s) {
 
 %type <num> type
 %type <param_list> param_list param_list_opt
-%type <str> primary_expression IDENTIFIER STRING_LITERAL
+%type <str> primary_expression IDENTIFIER 
+%type <expr> expression
+
 %start program
 
 %%
@@ -217,56 +229,179 @@ type:
   | IDENTIFIER { $$ = TYPE_OBJECT; } 
   | type LBRACKET RBRACKET { $$ = TYPE_ARRAY; }
   ;
+expression:
+      cast_expression
+    | expression PLUS expression {
+          if (!check_type_compatibility($1.type, $3.type)) {
+              yyerror("Incompatibilité de types dans l'opération '+'");
+          }
+          $$ = (struct expr_attr){.type = $1.type}; // ou $3.type
+      }
+    | expression MINUS expression {
+          if (!check_type_compatibility($1.type, $3.type)) {
+              yyerror("Incompatibilité de types dans l'opération '-'");
+          }
+          $$ = (struct expr_attr){.type = $1.type};
+      }
+    | expression TIMES expression {
+          if (!check_type_compatibility($1.type, $3.type)) {
+              yyerror("Incompatibilité de types dans l'opération '*'");
+          }
+          $$ = (struct expr_attr){.type = $1.type};
+      }
+    | expression DIVIDE expression {
+          if (!check_type_compatibility($1.type, $3.type)) {
+              yyerror("Incompatibilité de types dans l'opération '/'");
+          }
+          $$ = (struct expr_attr){.type = $1.type};
+      }
+    | expression GT expression {
+          if (!check_type_compatibility($1.type, $3.type)) {
+              yyerror("Incompatibilité de types dans l'opération '>'");
+          }
+          $$ = (struct expr_attr){.type = "boolean"};
+      }
+    | expression LT expression {
+          if (!check_type_compatibility($1.type, $3.type)) {
+              yyerror("Incompatibilité de types dans l'opération '<'");
+          }
+          $$ = (struct expr_attr){.type = "boolean"};
+      }
+    | expression LTE expression {
+          if (!check_type_compatibility($1.type, $3.type)) {
+              yyerror("Incompatibilité de types dans l'opération '<='");
+          }
+          $$ = (struct expr_attr){.type = "boolean"};
+      }
+    | expression GTE expression {
+          if (!check_type_compatibility($1.type, $3.type)) {
+              yyerror("Incompatibilité de types dans l'opération '>='");
+          }
+          $$ = (struct expr_attr){.type = "boolean"};
+      }
+    | expression EQ expression {
+          if (!check_type_compatibility($1.type, $3.type)) {
+              yyerror("Incompatibilité de types dans l'opération '=='");
+          }
+          $$ = (struct expr_attr){.type = "boolean"};
+      }
+    | expression NEQ expression {
+          if (!check_type_compatibility($1.type, $3.type)) {
+              yyerror("Incompatibilité de types dans l'opération '!='");
+          }
+          $$ = (struct expr_attr){.type = "boolean"};
+      }
+    | expression AND expression {
+          if (!check_type_compatibility($1.type, $3.type)) {
+              yyerror("Incompatibilité de types dans l'opération '&&'");
+          }
+          $$ = (struct expr_attr){.type = "boolean"};
+      }
+    | expression OR expression {
+          if (!check_type_compatibility($1.type, $3.type)) {
+              yyerror("Incompatibilité de types dans l'opération '||'");
+          }
+          $$ = (struct expr_attr){.type = "boolean"};
+      }
+    | NOT expression {
+          if (strcmp($2.type, "boolean") != 0) {
+              yyerror("L'opérateur '!' attend un booléen");
+          }
+          $$ = (struct expr_attr){.type = "boolean"};
+      }
+    | assignment
+    | IDENTIFIER PLUSPLUS {
+          if (!check_variable_declared(&symbol_table, $1, yylineno)) {
+              yyerror("Variable non déclarée");
+          }
+          $$ = (struct expr_attr){.type = get_variable_type(&symbol_table, $1), .strval = $1};
+      }
+    | IDENTIFIER MINUSMINUS {
+          if (!check_variable_declared(&symbol_table, $1, yylineno)) {
+              yyerror("Variable non déclarée");
+          }
+          $$ = (struct expr_attr){.type = get_variable_type(&symbol_table, $1), .strval = $1};
+      }
+    | NEW IDENTIFIER LPAREN argument_list RPAREN {
+          // Tu peux ajouter ici une vérification de l’existence du constructeur
+          $$ = (struct expr_attr){.type = $2};
+      }
+    | LPAREN type RPAREN expression {
+          $$ = $4;
+      }
+    | IDENTIFIER DOT IDENTIFIER LPAREN argument_list RPAREN {
+          // Vérifie si la méthode existe pour la classe $1
+          $$ = (struct expr_attr){.type = "unknown"}; // ou un type réel si tu peux le déduire
+      }
+    ;
 
 primary_expression:
     IDENTIFIER {
+        // Vérification que la variable est déclarée avant d'y accéder
         if (!check_variable_declared(&symbol_table, $1, yylineno)) {
             YYERROR;
         }
-        $$ = $1;
+        // Récupère le type de la variable à partir de la table des symboles
+        $$ = get_type_of_identifier(&symbol_table, $1);
     }
-    | INTEGER_LITERAL
-    | FLOAT_LITERAL
-    | STRING_LITERAL
-    | CHAR_LITERAL
-    | BOOLEAN_LITERAL
-    | THIS
-    | SUPER
-    | NEW array_creation
-    | LPAREN expression RPAREN
-    | IDENTIFIER DOT LENGTH
-    | IDENTIFIER DOT IDENTIFIER
-    | CAST LPAREN type RPAREN primary_expression
-    | IDENTIFIER DOT IDENTIFIER LPAREN argument_list RPAREN
+    | INTEGER_LITERAL {
+        // Type entier pour une valeur entière
+        $$ = TYPE_INT;
+    }
+    | FLOAT_LITERAL {
+        // Type flottant pour une valeur à virgule
+        $$ = TYPE_FLOAT;
+    }
+    | STRING_LITERAL {
+        // Type chaîne de caractères pour un littéral de type String
+        $$ = TYPE_STRING;
+    }
+    | CHAR_LITERAL {
+        // Type caractère pour un littéral de type char
+        $$ = TYPE_CHAR;
+    }
+    | BOOLEAN_LITERAL {
+        // Type booléen pour un littéral de type boolean
+        $$ = TYPE_BOOLEAN;
+    }
+    | THIS {
+        // Le type de `this` est spécifique à l'objet courant
+        $$ = TYPE_OBJECT; 
+    }
+    | SUPER {
+        // Le type de `super` est aussi lié à l'objet courant
+        $$ = TYPE_OBJECT;
+    }
+    | NEW array_creation {
+        // Lors de la création d'un tableau, le type est le type du tableau
+        $$ = TYPE_ARRAY;
+    }
+    | LPAREN expression RPAREN {
+        // Expression entre parenthèses, type d'une expression entre parenthèses est celui de l'expression
+$$ = $2.strval;
+    }
+    | IDENTIFIER DOT LENGTH {
+        // Pour l'accès à la longueur d'un tableau, renvoie un type entier
+        $$ = TYPE_INT;
+    }
+    | IDENTIFIER DOT IDENTIFIER {
+        // Accès à un membre d'objet, on récupère le type du membre
+        $$ = get_type_of_identifier(&symbol_table, $3);
+    }
+    | CAST LPAREN type RPAREN primary_expression 
+    | IDENTIFIER DOT IDENTIFIER LPAREN argument_list RPAREN {
+        // Appel de fonction, le type retourné dépend de la fonction appelée
+        $$ = get_function_return_type(&symbol_table, $3);
+    }
     ;
+
 
 cast_expression:
     unary_expression
     | CAST LPAREN type RPAREN cast_expression
     ;
 
-expression:
-    cast_expression
-    | expression PLUS expression
-    | expression MINUS expression
-    | expression TIMES expression
-    | expression DIVIDE expression
-    | expression GT expression
-    | expression LT expression
-    | expression LTE expression
-    | expression GTE expression
-    | expression EQ expression
-    | expression NEQ expression
-    | expression AND expression
-    | expression OR expression
-    | NOT expression
-    | assignment
-    | IDENTIFIER PLUSPLUS
-    | IDENTIFIER MINUSMINUS
-    | NEW IDENTIFIER LPAREN argument_list RPAREN
-    | LPAREN type RPAREN expression
-    | IDENTIFIER DOT IDENTIFIER LPAREN argument_list RPAREN
-    ;
+
 
 unary_expression:
     postfix_expression
@@ -406,31 +541,33 @@ statement:
     ;
 
 declaration:
-    type IDENTIFIER {  // Déclaration simple : type + nom de variable
+    type IDENTIFIER {
         printf("Déclaration variable locale : %s\n", $2);
-        symbol_insert(&symbol_table, $2, SYM_VARIABLE, $1, 0, 0, NULL);  // Insère la variable dans la table des symboles
+        symbol_insert(&symbol_table, $2, SYM_VARIABLE, $1, 0, 0, NULL);
     }
-    | type IDENTIFIER ASSIGN expression {  // Déclaration avec assignation : type + nom + valeur
+    | type IDENTIFIER ASSIGN expression {
         printf("Déclaration variable locale avec assignation : %s\n", $2);
-        symbol_insert(&symbol_table, $2, SYM_VARIABLE, $1, 0, 0, NULL);  // Insère la variable avec la valeur assignée
+        check_assignment_type($1, $4);  // Vérification de compatibilité de type
+        symbol_insert(&symbol_table, $2, SYM_VARIABLE, $1, 0, 0, NULL);
     }
-    | type IDENTIFIER LBRACKET RBRACKET {  // Déclaration de tableau
+    | type IDENTIFIER LBRACKET RBRACKET {
         printf("Déclaration tableau local : %s\n", $2);
-        symbol_insert(&symbol_table, $2, SYM_VARIABLE, TYPE_ARRAY, 0, 0, NULL);  // Insère un tableau dans la table des symboles
+        symbol_insert(&symbol_table, $2, SYM_VARIABLE, TYPE_ARRAY, 0, 0, NULL);
     }
-    | type IDENTIFIER LBRACKET RBRACKET ASSIGN array_init {  // Déclaration de tableau avec initialisation
+    | type IDENTIFIER LBRACKET RBRACKET ASSIGN array_init {
         printf("Déclaration tableau local avec initialisation : %s\n", $2);
-        symbol_insert(&symbol_table, $2, SYM_VARIABLE, TYPE_ARRAY, 0, 0, NULL);  // Insère un tableau initialisé dans la table des symboles
+        symbol_insert(&symbol_table, $2, SYM_VARIABLE, TYPE_ARRAY, 0, 0, NULL);
     }
-    | type IDENTIFIER ASSIGN NEW IDENTIFIER LPAREN argument_list RPAREN {  // Déclaration avec nouvel objet
+    | type IDENTIFIER ASSIGN NEW IDENTIFIER LPAREN argument_list RPAREN {
         printf("Déclaration variable avec instanciation d'objet : %s\n", $2);
-        symbol_insert(&symbol_table, $2, SYM_VARIABLE, TYPE_OBJECT, 0, 0, NULL);  // Insère un objet dans la table des symboles
+        symbol_insert(&symbol_table, $2, SYM_VARIABLE, TYPE_OBJECT, 0, 0, NULL);
     }
-    | type IDENTIFIER ASSIGN array_initializer {  // Déclaration avec initialisation (tableau)
+    | type IDENTIFIER ASSIGN array_initializer {
         printf("Déclaration tableau avec initialisation : %s\n", $2);
-        symbol_insert(&symbol_table, $2, SYM_VARIABLE, TYPE_ARRAY, 0, 0, NULL);  // Insère un tableau initialisé dans la table des symboles
+        symbol_insert(&symbol_table, $2, SYM_VARIABLE, TYPE_ARRAY, 0, 0, NULL);
     }
-    ;
+;
+
 
 block:
     LBRACE { enter_scope(&symbol_table); }

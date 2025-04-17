@@ -9,5 +9,9 @@ int check_variable_declared(SymbolTable *st, const char *name, int lineno);
 
 // Vérifie si un identifiant est un tableau lors de l'accès avec []
 int check_array_access(SymbolTable *st, const char *name, int lineno);
-
+int check_type_compatibility(DataType type1, DataType type2);
+// semantics.h
+DataType get_variable_type(SymbolTable* table, const char* name, int current_scope);
+const char* type_to_string(DataType type) ;
+void check_assignment_type(int declared_type, int expr_type) ;
 #endif
