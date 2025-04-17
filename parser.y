@@ -26,6 +26,7 @@ void yyerror(const char *s) {
     int num;
     double dbl;
     char chr;
+    
      struct {
         int count;
         char **names;
@@ -45,11 +46,13 @@ void yyerror(const char *s) {
 %token LBRACE RBRACE LPAREN RPAREN LBRACKET RBRACKET SEMICOLON COMMA DOT COLON STAR 
 %token PLUS MINUS TIMES DIVIDE ASSIGN PLUS_ASSIGN MINUS_ASSIGN TIMES_ASSIGN DIVIDE_ASSIGN
 %token EQ NEQ LT GT LTE GTE AND OR NOT
-%token INTEGER_LITERAL FLOAT_LITERAL  CHAR_LITERAL BOOLEAN_LITERAL IDENTIFIER
+%token INTEGER_LITERAL DOUBLE_LITERAL CHAR_LITERAL BOOLEAN_LITERAL IDENTIFIER
 %token PRIVATE PROTECTED FINAL 
 %token SYSTEM OUT PRINTLN PRINT
 %token LENGTH
 %token <str> STRING_LITERAL
+%token <expr_attr> FLOAT_LITERAL
+
 
 %left OR
 %left AND
@@ -348,9 +351,9 @@ primary_expression:
         // Type entier pour une valeur entière
         $$ = TYPE_INT;
     }
-    | FLOAT_LITERAL {
+    | DOUBLE_LITERAL {
         // Type flottant pour une valeur à virgule
-        $$ = TYPE_FLOAT;
+        $$ = TYPE_DOUBLE;
     }
     | STRING_LITERAL {
         // Type chaîne de caractères pour un littéral de type String

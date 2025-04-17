@@ -87,7 +87,7 @@ extern int yylineno;
 "/="    { return DIVIDE_ASSIGN; }
 
 [0-9]+         { yylval.num = atoi(yytext); return INTEGER_LITERAL; }
-[0-9]+\.[0-9]+ { yylval.dbl = atof(yytext); return FLOAT_LITERAL; }
+[0-9]+\.[0-9]+ { yylval.dbl = atof(yytext); return DOUBLE_LITERAL; }
 \"[^"\n]*\"  { yylval.str = strdup(yytext); return STRING_LITERAL; }
 \'[^'\n]\'   { yylval.chr = yytext[1]; return CHAR_LITERAL; }
 [a-zA-Z_][a-zA-Z0-9_]* {

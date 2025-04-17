@@ -1,8 +1,14 @@
-Erreurs sémantiques à traiter: 
+Erreurs sémantiques à traiter:
+
+DONE :
  - Variable double déclarée , DONE 
  - Variable non déclarée . DONE but could be better 
- - Incompatibilité de type 
- - Division par zéro 
+ - Incompatibilité de type , DONE 
+
+
+not done yet :
+
+- Division par zéro 
  - Tableau  (taille invalide) 
  - Tableau (type d'element invalide) 
  - Tableau  (accès à de mauvais indices dans un tableau) 
