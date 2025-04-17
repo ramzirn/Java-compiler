@@ -3,6 +3,7 @@
 
 #include "symbol_table.h"
 #include <stdio.h>
+extern int yylineno;
 
 // Vérifie si une variable est déclarée avant utilisation
 int check_variable_declared(SymbolTable *st, const char *name, int lineno);
