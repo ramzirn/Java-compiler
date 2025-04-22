@@ -68,7 +68,7 @@ void yyerror(const char *s) {
 %type <num> type
 %type <param_list> param_list param_list_opt
 %type <str> primary_expression IDENTIFIER 
-%type <expr> expression
+%type <expr> expression array_creation
 
 %start program
 
@@ -440,11 +440,31 @@ assignment:
     | THIS DOT IDENTIFIER DIVIDE_ASSIGN expression
     ;
 
-array_creation:
-    type LBRACKET expression RBRACKET
-    | type LBRACKET RBRACKET array_initializer
-    | type LBRACKET expression RBRACKET array_dimensions
-    ;
+array_creation
+    : type LBRACKET expression RBRACKET {
+        if ($3.type && strcmp($3.type, "int") != 0) {
+            printf("Erreur semantique: la taille du tableau doit être de type int.\n");
+        } else if ($3.strval && atoi($3.strval) < 0) {
+            printf("Erreur semantique: taille de tableau invalide (%s).\n", $3.strval);
+        }
+        $$.type = strdup("int[]");
+        $$.strval = NULL;
+    }
+    | type LBRACKET RBRACKET array_initializer {
+        $$.type = strdup("int[]");
+        $$.strval = NULL;
+    }
+    | type LBRACKET expression RBRACKET array_dimensions {
+        if ($3.type && strcmp($3.type, "int") != 0) {
+            printf("Erreur semantique: la taille du tableau invalide\n");
+        } else if ($3.strval && atoi($3.strval) < 0) {
+            printf("Erreur semantique: taille de tableau invalide (%s).\n", $3.strval);
+        }
+        $$.type = strdup("int[]");
+        $$.strval = NULL;
+    }
+;
+
 
 array_initializer:
     LBRACE expression_list RBRACE
