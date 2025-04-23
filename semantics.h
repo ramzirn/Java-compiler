@@ -15,4 +15,5 @@ int check_type_compatibility(DataType type1, DataType type2);
 DataType get_variable_type(SymbolTable* table, const char* name, int current_scope);
 const char* type_to_string(DataType type) ;
 void check_assignment_type(int declared_type, int expr_type) ;
+int check_array_element_type(DataType array_type, DataType element_type) ;
 #endif
