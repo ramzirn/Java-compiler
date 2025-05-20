@@ -1,44 +1,45 @@
 %{
 #include "symbol_table.h"
+#include "quads.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-int check_variable_declared(SymbolTable* table, char* name, int line);
-int check_type_compatibility(char* type1, char* type2);
-char* get_variable_type(SymbolTable* table, char* name);
-
 
 extern int yylex();
 extern int yyparse();
 extern FILE *yyin;
 extern int yylineno;
 SymbolTable symbol_table;
+QuadTable quad_table;
 
 void yyerror(const char *s) {
     fprintf(stderr, "Erreur syntaxique ligne %d: %s\n", yylineno, s);
 }
 %}
+
 %code requires {
     #include "symbol_table.h"
 }
+
 %union {
-    char* str;
+    char *str;
     int num;
     double dbl;
     char chr;
-    
-     struct {
+    struct {
         int count;
         char **names;
         DataType *types;
     } param_list;
-
-      struct expr_attr {
-        char* type;
-    char* strval; // optionnel, utile pour garder le nom de la variable   
-     }expr;
+    ExprAttr expr;
 }
 
+%token <str> IDENTIFIER STRING_LITERAL
+%token <num> INTEGER_LITERAL
+%token <dbl> DOUBLE_LITERAL
+%token <chr> CHAR_LITERAL
+%token <str> BOOLEAN_LITERAL
+%token <expr> FLOAT_LITERAL
 %token NULL_LITERAL PLUSPLUS MINUSMINUS QUESTION
 %token STRING IMPORT PUBLIC CLASS STATIC VOID INT DOUBLE CHAR BOOLEAN
 %token IF ELSE FOR WHILE SWITCH CASE DEFAULT TRY CATCH FINALLY
@@ -46,13 +47,9 @@ void yyerror(const char *s) {
 %token LBRACE RBRACE LPAREN RPAREN LBRACKET RBRACKET SEMICOLON COMMA DOT COLON STAR 
 %token PLUS MINUS TIMES DIVIDE ASSIGN PLUS_ASSIGN MINUS_ASSIGN TIMES_ASSIGN DIVIDE_ASSIGN
 %token EQ NEQ LT GT LTE GTE AND OR NOT
-%token INTEGER_LITERAL DOUBLE_LITERAL CHAR_LITERAL BOOLEAN_LITERAL IDENTIFIER
 %token PRIVATE PROTECTED FINAL 
 %token SYSTEM OUT PRINTLN PRINT
 %token LENGTH
-%token <str> STRING_LITERAL
-%token <expr_attr> FLOAT_LITERAL
-
 
 %left OR
 %left AND
@@ -67,8 +64,10 @@ void yyerror(const char *s) {
 
 %type <num> type
 %type <param_list> param_list param_list_opt
-%type <str> primary_expression IDENTIFIER 
-%type <expr> expression array_creation
+%type <expr> expression primary_expression assignment array_creation
+%type <expr> array_access method_invocation cast_expression unary_expression
+%type <expr> postfix_expression array_init println_args
+%type <str> qualified_name qualified_access
 
 %start program
 
@@ -136,35 +135,32 @@ field_decl:
         printf("Règle field_decl atteinte: nom = %s, type = %d\n", $3, $2);
         symbol_insert(&symbol_table, $3, SYM_VARIABLE, $2, 0, 0, NULL);
     }
-  | modifiers type IDENTIFIER ASSIGN expression SEMICOLON {
+    | modifiers type IDENTIFIER ASSIGN expression SEMICOLON {
         printf("Règle field_decl avec initialisation: nom = %s, type = %d\n", $3, $2);
         symbol_insert(&symbol_table, $3, SYM_VARIABLE, $2, 0, 0, NULL);
+        add_quad(&quad_table, ":=", $5.place, NULL, $3);
     }
-  | modifiers type IDENTIFIER LBRACKET RBRACKET SEMICOLON {
+    | modifiers type IDENTIFIER LBRACKET RBRACKET SEMICOLON {
         printf("Règle field_decl tableau: nom = %s, type = tableau de %d\n", $3, $2);
         symbol_insert(&symbol_table, $3, SYM_VARIABLE, TYPE_ARRAY, 0, 0, NULL);
     }
-  | modifiers type IDENTIFIER LBRACKET RBRACKET ASSIGN array_init SEMICOLON {
+    | modifiers type IDENTIFIER LBRACKET RBRACKET ASSIGN array_init SEMICOLON {
         printf("Règle field_decl tableau initialisé: nom = %s, type = tableau de %d\n", $3, $2);
         symbol_insert(&symbol_table, $3, SYM_VARIABLE, TYPE_ARRAY, 0, 0, NULL);
+        add_quad(&quad_table, ":=", $7.place, NULL, $3);
     }
-  | modifiers type IDENTIFIER ASSIGN array_init SEMICOLON {
+    | modifiers type IDENTIFIER ASSIGN array_init SEMICOLON {
         printf("Règle field_decl tableau (sans []) avec init: nom = %s, type = tableau de %d\n", $3, $2);
         symbol_insert(&symbol_table, $3, SYM_VARIABLE, TYPE_ARRAY, 0, 0, NULL);
+        add_quad(&quad_table, ":=", $5.place, NULL, $3);
     }
-  ;
+    ;
 
 method_decl:
     modifiers type IDENTIFIER LPAREN param_list_opt RPAREN {
         printf("Déclaration de fonction: nom = %s, type retour = %d, nb params = %d\n", $3, $2, $5.count);
-        
-        // Insérer la fonction dans le scope actuel (généralement global)
         symbol_insert_function(&symbol_table, $3, $2, $5.count, $5.names, $5.types);
-        
-        // Entrer dans le scope de la fonction
         enter_scope(&symbol_table);
-
-        // Insérer les paramètres comme variables locales dans ce scope
         for (int i = 0; i < $5.count; ++i) {
             Symbol *inserted = symbol_insert(&symbol_table, $5.names[i], SYM_VARIABLE, $5.types[i], 0, 0, NULL);
             if (inserted) {
@@ -173,10 +169,9 @@ method_decl:
         }
     }
     method_body {
-        // Sortie du scope de la fonction
         exit_scope(&symbol_table);
     }
-;
+    ;
 
 param_list_opt:
     /* empty */ {
@@ -184,26 +179,26 @@ param_list_opt:
         $$.names = NULL;
         $$.types = NULL;
     }
-  | param_list { $$ = $1; }
-
+    | param_list { $$ = $1; }
+    ;
 
 param_list:
     type IDENTIFIER {
-        $$ = (typeof($$)){ .count = 1 };
-        $$ .names = malloc(sizeof(char*));
-        $$ .types = malloc(sizeof(DataType));
-        $$ .names[0] = strdup($2);
-        $$ .types[0] = $1;
+        $$.count = 1;
+        $$.names = malloc(sizeof(char *));
+        $$.types = malloc(sizeof(DataType));
+        $$.names[0] = strdup($2);
+        $$.types[0] = $1;
     }
-  | param_list COMMA type IDENTIFIER {
+    | param_list COMMA type IDENTIFIER {
         $$ = $1;
-        $$ .count++;
-        $$ .names = realloc($$.names, $$ .count * sizeof(char*));
-        $$ .types = realloc($$.types, $$ .count * sizeof(DataType));
-        $$ .names[$$.count - 1] = strdup($4);
-        $$ .types[$$.count - 1] = $3;
+        $$.count++;
+        $$.names = realloc($$.names, $$.count * sizeof(char *));
+        $$.types = realloc($$.types, $$.count * sizeof(DataType));
+        $$.names[$$.count - 1] = strdup($4);
+        $$.types[$$.count - 1] = $3;
     }
-
+    ;
 
 constructor_decl:
     modifiers IDENTIFIER LPAREN param_list RPAREN constructor_body
@@ -224,266 +219,446 @@ modifier:
 
 type:
     INT { $$ = TYPE_INT; }
-  | DOUBLE { $$ = TYPE_DOUBLE; }
-  | CHAR { $$ = TYPE_CHAR; }
-  | BOOLEAN { $$ = TYPE_BOOLEAN; }
-  | STRING { $$ = TYPE_STRING; }
-  | VOID { $$ = TYPE_VOID; }
-  | IDENTIFIER { $$ = TYPE_OBJECT; } 
-  | type LBRACKET RBRACKET { $$ = TYPE_ARRAY; }
-  ;
+    | DOUBLE { $$ = TYPE_DOUBLE; }
+    | CHAR { $$ = TYPE_CHAR; }
+    | BOOLEAN { $$ = TYPE_BOOLEAN; }
+    | STRING { $$ = TYPE_STRING; }
+    | VOID { $$ = TYPE_VOID; }
+    | IDENTIFIER { $$ = TYPE_OBJECT; }
+    | type LBRACKET RBRACKET { $$ = TYPE_ARRAY; }
+    ;
+
 expression:
-      cast_expression
+    cast_expression { $$ = $1; }
     | expression PLUS expression {
-          if (!check_type_compatibility($1.type, $3.type)) {
-              yyerror("Incompatibilité de types dans l'opération '+'");
-          }
-          $$ = (struct expr_attr){.type = $1.type}; // ou $3.type
-      }
+        if (!check_type_compatibility($1.type, $3.type)) {
+            yyerror("Incompatibilité de types dans l'opération '+'");
+        }
+        $$.type = $1.type;
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "+", $1.place, $3.place, $$.place);
+    }
     | expression MINUS expression {
-          if (!check_type_compatibility($1.type, $3.type)) {
-              yyerror("Incompatibilité de types dans l'opération '-'");
-          }
-          $$ = (struct expr_attr){.type = $1.type};
-      }
+        if (!check_type_compatibility($1.type, $3.type)) {
+            yyerror("Incompatibilité de types dans l'opération '-'");
+        }
+        $$.type = $1.type;
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "-", $1.place, $3.place, $$.place);
+    }
     | expression TIMES expression {
-          if (!check_type_compatibility($1.type, $3.type)) {
-              yyerror("Incompatibilité de types dans l'opération '*'");
-          }
-          $$ = (struct expr_attr){.type = $1.type};
-      }
+        if (!check_type_compatibility($1.type, $3.type)) {
+            yyerror("Incompatibilité de types dans l'opération '*'");
+        }
+        $$.type = $1.type;
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "*", $1.place, $3.place, $$.place);
+    }
     | expression DIVIDE expression {
-          if (!check_type_compatibility($1.type, $3.type)) {
-              yyerror("Incompatibilité de types dans l'opération '/'");
-          }
-          $$ = (struct expr_attr){.type = $1.type};
-      }
+        if (!check_type_compatibility($1.type, $3.type)) {
+            yyerror("Incompatibilité de types dans l'opération '/'");
+        }
+        $$.type = $1.type;
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "/", $1.place, $3.place, $$.place);
+    }
     | expression GT expression {
-          if (!check_type_compatibility($1.type, $3.type)) {
-              yyerror("Incompatibilité de types dans l'opération '>'");
-          }
-          $$ = (struct expr_attr){.type = "boolean"};
-      }
+        if (!check_type_compatibility($1.type, $3.type)) {
+            yyerror("Incompatibilité de types dans l'opération '>'");
+        }
+        $$.type = strdup("boolean");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, ">", $1.place, $3.place, $$.place);
+    }
     | expression LT expression {
-          if (!check_type_compatibility($1.type, $3.type)) {
-              yyerror("Incompatibilité de types dans l'opération '<'");
-          }
-          $$ = (struct expr_attr){.type = "boolean"};
-      }
+        if (!check_type_compatibility($1.type, $3.type)) {
+            yyerror("Incompatibilité de types dans l'opération '<'");
+        }
+        $$.type = strdup("boolean");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "<", $1.place, $3.place, $$.place);
+    }
     | expression LTE expression {
-          if (!check_type_compatibility($1.type, $3.type)) {
-              yyerror("Incompatibilité de types dans l'opération '<='");
-          }
-          $$ = (struct expr_attr){.type = "boolean"};
-      }
+        if (!check_type_compatibility($1.type, $3.type)) {
+            yyerror("Incompatibilité de types dans l'opération '<='");
+        }
+        $$.type = strdup("boolean");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "<=", $1.place, $3.place, $$.place);
+    }
     | expression GTE expression {
-          if (!check_type_compatibility($1.type, $3.type)) {
-              yyerror("Incompatibilité de types dans l'opération '>='");
-          }
-          $$ = (struct expr_attr){.type = "boolean"};
-      }
+        if (!check_type_compatibility($1.type, $3.type)) {
+            yyerror("Incompatibilité de types dans l'opération '>='");
+        }
+        $$.type = strdup("boolean");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, ">=", $1.place, $3.place, $$.place);
+    }
     | expression EQ expression {
-          if (!check_type_compatibility($1.type, $3.type)) {
-              yyerror("Incompatibilité de types dans l'opération '=='");
-          }
-          $$ = (struct expr_attr){.type = "boolean"};
-      }
+        if (!check_type_compatibility($1.type, $3.type)) {
+            yyerror("Incompatibilité de types dans l'opération '=='");
+        }
+        $$.type = strdup("boolean");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "==", $1.place, $3.place, $$.place);
+    }
     | expression NEQ expression {
-          if (!check_type_compatibility($1.type, $3.type)) {
-              yyerror("Incompatibilité de types dans l'opération '!='");
-          }
-          $$ = (struct expr_attr){.type = "boolean"};
-      }
+        if (!check_type_compatibility($1.type, $3.type)) {
+            yyerror("Incompatibilité de types dans l'opération '!='");
+        }
+        $$.type = strdup("boolean");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "!=", $1.place, $3.place, $$.place);
+    }
     | expression AND expression {
-          if (!check_type_compatibility($1.type, $3.type)) {
-              yyerror("Incompatibilité de types dans l'opération '&&'");
-          }
-          $$ = (struct expr_attr){.type = "boolean"};
-      }
+        if (strcmp($1.type, "boolean") != 0 || strcmp($3.type, "boolean") != 0) {
+            yyerror("L'opérateur '&&' attend des booléens");
+        }
+        $$.type = strdup("boolean");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "&&", $1.place, $3.place, $$.place);
+    }
     | expression OR expression {
-          if (!check_type_compatibility($1.type, $3.type)) {
-              yyerror("Incompatibilité de types dans l'opération '||'");
-          }
-          $$ = (struct expr_attr){.type = "boolean"};
-      }
+        if (strcmp($1.type, "boolean") != 0 || strcmp($3.type, "boolean") != 0) {
+            yyerror("L'opérateur '||' attend des booléens");
+        }
+        $$.type = strdup("boolean");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "||", $1.place, $3.place, $$.place);
+    }
     | NOT expression {
-          if (strcmp($2.type, "boolean") != 0) {
-              yyerror("L'opérateur '!' attend un booléen");
-          }
-          $$ = (struct expr_attr){.type = "boolean"};
-      }
-    | assignment
+        if (strcmp($2.type, "boolean") != 0) {
+            yyerror("L'opérateur '!' attend un booléen");
+        }
+        $$.type = strdup("boolean");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "!", $2.place, NULL, $$.place);
+    }
+    | assignment { $$ = $1; }
     | IDENTIFIER PLUSPLUS {
-          if (!check_variable_declared(&symbol_table, $1, yylineno)) {
-              yyerror("Variable non déclarée");
-          }
-          $$ = (struct expr_attr){.type = get_variable_type(&symbol_table, $1), .strval = $1};
-      }
+        if (!check_variable_declared(&symbol_table, $1, yylineno)) {
+            yyerror("Variable non déclarée");
+        }
+        $$.type = get_variable_type(&symbol_table, $1);
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "+", $1, "1", $$.place);
+        add_quad(&quad_table, ":=", $$.place, NULL, $1);
+    }
     | IDENTIFIER MINUSMINUS {
-          if (!check_variable_declared(&symbol_table, $1, yylineno)) {
-              yyerror("Variable non déclarée");
-          }
-          $$ = (struct expr_attr){.type = get_variable_type(&symbol_table, $1), .strval = $1};
-      }
+        if (!check_variable_declared(&symbol_table, $1, yylineno)) {
+            yyerror("Variable non déclarée");
+        }
+        $$.type = get_variable_type(&symbol_table, $1);
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "-", $1, "1", $$.place);
+        add_quad(&quad_table, ":=", $$.place, NULL, $1);
+    }
     | NEW IDENTIFIER LPAREN argument_list RPAREN {
-          // Tu peux ajouter ici une vérification de l’existence du constructeur
-          $$ = (struct expr_attr){.type = $2};
-      }
+        $$.type = strdup($2);
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "new", $2, NULL, $$.place);
+    }
     | LPAREN type RPAREN expression {
-          $$ = $4;
-      }
+        $$ = $4;
+    }
     | IDENTIFIER DOT IDENTIFIER LPAREN argument_list RPAREN {
-          // Vérifie si la méthode existe pour la classe $1
-          $$ = (struct expr_attr){.type = "unknown"}; // ou un type réel si tu peux le déduire
-      }
+        $$.type = strdup("unknown");
+        $$.place = new_temp(&quad_table);
+        char *method_call = malloc(strlen($1) + strlen($3) + 2);
+        sprintf(method_call, "%s.%s", $1, $3);
+        add_quad(&quad_table, "call", method_call, NULL, $$.place);
+        free(method_call);
+    }
     ;
 
 primary_expression:
     IDENTIFIER {
-        // Vérification que la variable est déclarée avant d'y accéder
         if (!check_variable_declared(&symbol_table, $1, yylineno)) {
-            YYERROR;
+            yyerror("Variable non déclarée");
         }
-        // Récupère le type de la variable à partir de la table des symboles
-        $$ = get_type_of_identifier(&symbol_table, $1);
+        $$.type = get_variable_type(&symbol_table, $1);
+        $$.place = strdup($1);
     }
     | INTEGER_LITERAL {
-        // Type entier pour une valeur entière
-        $$ = TYPE_INT;
+        $$.type = strdup("int");
+        char *literal = malloc(32);
+        snprintf(literal, 32, "%d", $1);
+        $$.place = literal;
     }
     | DOUBLE_LITERAL {
-        // Type flottant pour une valeur à virgule
-        $$ = TYPE_DOUBLE;
+        $$.type = strdup("double");
+        char *literal = malloc(32);
+        snprintf(literal, 32, "%f", $1);
+        $$.place = literal;
     }
     | STRING_LITERAL {
-        // Type chaîne de caractères pour un littéral de type String
-        $$ = TYPE_STRING;
+        $$.type = strdup("String");
+        $$.place = strdup($1);
     }
     | CHAR_LITERAL {
-        // Type caractère pour un littéral de type char
-        $$ = TYPE_CHAR;
+        $$.type = strdup("char");
+        char *literal = malloc(4);
+        snprintf(literal, 4, "'%c'", $1);
+        $$.place = literal;
     }
     | BOOLEAN_LITERAL {
-        // Type booléen pour un littéral de type boolean
-        $$ = TYPE_BOOLEAN;
+        $$.type = strdup("boolean");
+        $$.place = strdup($1);
     }
     | THIS {
-        // Le type de `this` est spécifique à l'objet courant
-        $$ = TYPE_OBJECT; 
+        $$.type = strdup("object");
+        $$.place = strdup("this");
     }
     | SUPER {
-        // Le type de `super` est aussi lié à l'objet courant
-        $$ = TYPE_OBJECT;
+        $$.type = strdup("object");
+        $$.place = strdup("super");
     }
     | NEW array_creation {
-        // Lors de la création d'un tableau, le type est le type du tableau
-        $$ = TYPE_ARRAY;
+        $$ = $2;
     }
     | LPAREN expression RPAREN {
-        // Expression entre parenthèses, type d'une expression entre parenthèses est celui de l'expression
-$$ = $2.strval;
+        $$ = $2;
     }
     | IDENTIFIER DOT LENGTH {
-        // Pour l'accès à la longueur d'un tableau, renvoie un type entier
-        $$ = TYPE_INT;
+        $$.type = strdup("int");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "length", $1, NULL, $$.place);
     }
     | IDENTIFIER DOT IDENTIFIER {
-        // Accès à un membre d'objet, on récupère le type du membre
-        $$ = get_type_of_identifier(&symbol_table, $3);
+        $$.type = get_variable_type(&symbol_table, $3);
+        $$.place = new_temp(&quad_table);
+        char *access = malloc(strlen($1) + strlen($3) + 2);
+        sprintf(access, "%s.%s", $1, $3);
+        add_quad(&quad_table, ".", access, NULL, $$.place);
+        free(access);
     }
-    | CAST LPAREN type RPAREN primary_expression 
+    | CAST LPAREN type RPAREN primary_expression {
+        $$ = $5;
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "cast", $5.place, NULL, $$.place);
+    }
     | IDENTIFIER DOT IDENTIFIER LPAREN argument_list RPAREN {
-        // Appel de fonction, le type retourné dépend de la fonction appelée
-        $$ = get_function_return_type(&symbol_table, $3);
+        $$.type = strdup("unknown");
+        $$.place = new_temp(&quad_table);
+        char *method_call = malloc(strlen($1) + strlen($3) + 2);
+        sprintf(method_call, "%s.%s", $1, $3);
+        add_quad(&quad_table, "call", method_call, NULL, $$.place);
+        free(method_call);
     }
     ;
-
 
 cast_expression:
-    unary_expression
-    | CAST LPAREN type RPAREN cast_expression
+    unary_expression { $$ = $1; }
+    | CAST LPAREN type RPAREN cast_expression {
+        $$ = $5;
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "cast", $5.place, NULL, $$.place);
+    }
     ;
 
-
-
 unary_expression:
-    postfix_expression
-    | MINUS unary_expression
-    | NOT unary_expression
+    postfix_expression { $$ = $1; }
+    | MINUS unary_expression {
+        $$.type = $2.type;
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "-", "0", $2.place, $$.place);
+    }
+    | NOT unary_expression {
+        if (strcmp($2.type, "boolean") != 0) {
+            yyerror("L'opérateur '!' attend un booléen");
+        }
+        $$.type = strdup("boolean");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "!", $2.place, NULL, $$.place);
+    }
     ;
 
 postfix_expression:
-    primary_expression
-    | postfix_expression LBRACKET expression RBRACKET
-    | postfix_expression DOT LENGTH
-    | postfix_expression DOT IDENTIFIER LPAREN argument_list RPAREN
+    primary_expression { $$ = $1; }
+    | postfix_expression LBRACKET expression RBRACKET {
+        $$.type = strdup("unknown");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "array_access", $1.place, $3.place, $$.place);
+    }
+    | postfix_expression DOT LENGTH {
+        $$.type = strdup("int");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "length", $1.place, NULL, $$.place);
+    }
+    | postfix_expression DOT IDENTIFIER LPAREN argument_list RPAREN {
+        $$.type = strdup("unknown");
+        $$.place = new_temp(&quad_table);
+        char *method_call = malloc(strlen($1.place) + strlen($3) + 2);
+        sprintf(method_call, "%s.%s", $1.place, $3);
+        add_quad(&quad_table, "call", method_call, NULL, $$.place);
+        free(method_call);
+    }
     ;
 
 assignment:
- IDENTIFIER ASSIGN expression {
+    IDENTIFIER ASSIGN expression {
         if (!check_variable_declared(&symbol_table, $1, yylineno)) {
-            YYERROR;
+            yyerror("Variable non déclarée");
         }
-    }    | IDENTIFIER PLUS_ASSIGN expression
-    | IDENTIFIER MINUS_ASSIGN expression
-    | IDENTIFIER TIMES_ASSIGN expression
-    | IDENTIFIER DIVIDE_ASSIGN expression
-    | array_access ASSIGN expression
-    | array_access PLUS_ASSIGN expression
-    | array_access MINUS_ASSIGN expression
-    | array_access TIMES_ASSIGN expression
-    | array_access DIVIDE_ASSIGN expression
-    | THIS DOT IDENTIFIER ASSIGN expression
-    | THIS DOT IDENTIFIER PLUS_ASSIGN expression
-    | THIS DOT IDENTIFIER MINUS_ASSIGN expression
-    | THIS DOT IDENTIFIER TIMES_ASSIGN expression
-    | THIS DOT IDENTIFIER DIVIDE_ASSIGN expression
+        $$.type = get_variable_type(&symbol_table, $1);
+        $$.place = strdup($1);
+        add_quad(&quad_table, ":=", $3.place, NULL, $1);
+    }
+    | IDENTIFIER PLUS_ASSIGN expression {
+        if (!check_variable_declared(&symbol_table, $1, yylineno)) {
+            yyerror("Variable non déclarée");
+        }
+        $$.type = get_variable_type(&symbol_table, $1);
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "+", $1, $3.place, $$.place);
+        add_quad(&quad_table, ":=", $$.place, NULL, $1);
+    }
+    | IDENTIFIER MINUS_ASSIGN expression {
+        if (!check_variable_declared(&symbol_table, $1, yylineno)) {
+            yyerror("Variable non déclarée");
+        }
+        $$.type = get_variable_type(&symbol_table, $1);
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "-", $1, $3.place, $$.place);
+        add_quad(&quad_table, ":=", $$.place, NULL, $1);
+    }
+    | IDENTIFIER TIMES_ASSIGN expression {
+        if (!check_variable_declared(&symbol_table, $1, yylineno)) {
+            yyerror("Variable non déclarée");
+        }
+        $$.type = get_variable_type(&symbol_table, $1);
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "*", $1, $3.place, $$.place);
+        add_quad(&quad_table, ":=", $$.place, NULL, $1);
+    }
+    | IDENTIFIER DIVIDE_ASSIGN expression {
+        if (!check_variable_declared(&symbol_table, $1, yylineno)) {
+            yyerror("Variable non déclarée");
+        }
+        $$.type = get_variable_type(&symbol_table, $1);
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "/", $1, $3.place, $$.place);
+        add_quad(&quad_table, ":=", $$.place, NULL, $1);
+    }
+    | array_access ASSIGN expression {
+        $$.type = strdup("unknown");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "array_assign", $1.place, $3.place, $$.place);
+    }
+    | array_access PLUS_ASSIGN expression {
+        $$.type = strdup("unknown");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "+", $1.place, $3.place, $$.place);
+        add_quad(&quad_table, "array_assign", $$.place, NULL, $1.place);
+    }
+    | array_access MINUS_ASSIGN expression {
+        $$.type = strdup("unknown");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "-", $1.place, $3.place, $$.place);
+        add_quad(&quad_table, "array_assign", $$.place, NULL, $1.place);
+    }
+    | array_access TIMES_ASSIGN expression {
+        $$.type = strdup("unknown");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "*", $1.place, $3.place, $$.place);
+        add_quad(&quad_table, "array_assign", $$.place, NULL, $1.place);
+    }
+    | array_access DIVIDE_ASSIGN expression {
+        $$.type = strdup("unknown");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "/", $1.place, $3.place, $$.place);
+        add_quad(&quad_table, "array_assign", $$.place, NULL, $1.place);
+    }
+    | THIS DOT IDENTIFIER ASSIGN expression {
+        $$.type = strdup("unknown");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, ":=", $5.place, NULL, $3);
+    }
+    | THIS DOT IDENTIFIER PLUS_ASSIGN expression {
+        $$.type = strdup("unknown");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "+", $3, $5.place, $$.place);
+        add_quad(&quad_table, ":=", $$.place, NULL, $3);
+    }
+    | THIS DOT IDENTIFIER MINUS_ASSIGN expression {
+        $$.type = strdup("unknown");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "-", $3, $5.place, $$.place);
+        add_quad(&quad_table, ":=", $$.place, NULL, $3);
+    }
+    | THIS DOT IDENTIFIER TIMES_ASSIGN expression {
+        $$.type = strdup("unknown");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "*", $3, $5.place, $$.place);
+        add_quad(&quad_table, ":=", $$.place, NULL, $3);
+    }
+    | THIS DOT IDENTIFIER DIVIDE_ASSIGN expression {
+        $$.type = strdup("unknown");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "/", $3, $5.place, $$.place);
+        add_quad(&quad_table, ":=", $$.place, NULL, $3);
+    }
     ;
 
-array_creation
-    : type LBRACKET expression RBRACKET {
+array_creation:
+    type LBRACKET expression RBRACKET {
         if ($3.type && strcmp($3.type, "int") != 0) {
-            printf("Erreur semantique: la taille du tableau doit être de type int.\n");
-        } else if ($3.strval && atoi($3.strval) < 0) {
-            printf("Erreur semantique: taille de tableau invalide (%s).\n", $3.strval);
+            printf("Erreur sémantique: la taille du tableau doit être de type int.\n");
         }
-        $$.type = strdup("int[]");
-        $$.strval = NULL;
+        $$.type = strdup("array");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "new_array", $3.place, NULL, $$.place);
     }
     | type LBRACKET RBRACKET array_initializer {
-        $$.type = strdup("int[]");
-        $$.strval = NULL;
+        $$.type = strdup("array");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "new_array", NULL, NULL, $$.place);
     }
     | type LBRACKET expression RBRACKET array_dimensions {
         if ($3.type && strcmp($3.type, "int") != 0) {
-            printf("Erreur semantique: la taille du tableau invalide\n");
-        } else if ($3.strval && atoi($3.strval) < 0) {
-            printf("Erreur semantique: taille de tableau invalide (%s).\n", $3.strval);
+            printf("Erreur sémantique: la taille du tableau doit être de type int.\n");
         }
-        $$.type = strdup("int[]");
-        $$.strval = NULL;
+        $$.type = strdup("array");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "new_array", $3.place, NULL, $$.place);
     }
-;
-
+    ;
 
 array_initializer:
     LBRACE expression_list RBRACE
     | LBRACE RBRACE
     ;
 
+array_init:
+    NEW array_creation {
+        $$ = $2;
+    }
+    | LBRACE expression_list RBRACE {
+        $$.type = strdup("array");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "array_init", NULL, NULL, $$.place);
+    }
+    ;
+
 array_access:
-    IDENTIFIER LBRACKET expression RBRACKET
-    | array_access LBRACKET expression RBRACKET
+    IDENTIFIER LBRACKET expression RBRACKET {
+        if (!check_variable_declared(&symbol_table, $1, yylineno)) {
+            yyerror("Variable non déclarée");
+        }
+        $$.type = strdup("unknown");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "array_access", $1, $3.place, $$.place);
+    }
+    | array_access LBRACKET expression RBRACKET {
+        $$.type = strdup("unknown");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "array_access", $1.place, $3.place, $$.place);
+    }
     ;
 
 array_dimensions:
     LBRACKET expression RBRACKET
     | array_dimensions LBRACKET expression RBRACKET
-    ;
-
-array_init:
-    NEW array_creation
-    | LBRACE expression_list RBRACE
     ;
 
 expression_list:
@@ -492,27 +667,41 @@ expression_list:
     ;
 
 method_invocation:
-    IDENTIFIER LPAREN argument_list RPAREN
-    | qualified_access LPAREN argument_list RPAREN
-    | PRIMARY DOT IDENTIFIER LPAREN argument_list RPAREN
+    IDENTIFIER LPAREN argument_list RPAREN {
+        $$.type = strdup("unknown");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "call", $1, NULL, $$.place);
+    }
+    | qualified_access LPAREN argument_list RPAREN {
+        $$.type = strdup("unknown");
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "call", $1, NULL, $$.place);
+    }
+    | primary_expression DOT IDENTIFIER LPAREN argument_list RPAREN {
+        $$.type = strdup("unknown");
+        $$.place = new_temp(&quad_table);
+        char *method_call = malloc(strlen($1.place) + strlen($3) + 2);
+        sprintf(method_call, "%s.%s", $1.place, $3);
+        add_quad(&quad_table, "call", method_call, NULL, $$.place);
+        free(method_call);
+    }
     ;
 
 qualified_access:
-    IDENTIFIER DOT IDENTIFIER
-    | qualified_access DOT IDENTIFIER
-    | SYSTEM DOT OUT DOT PRINTLN
-    ;
-
-PRIMARY:
-    THIS
-    | SUPER
-    | INTEGER_LITERAL
-    | FLOAT_LITERAL
-    | CHAR_LITERAL
-    | STRING_LITERAL
-    | BOOLEAN_LITERAL
-    | NEW array_creation
-    | LPAREN expression RPAREN
+    IDENTIFIER DOT IDENTIFIER {
+        char *access = malloc(strlen($1) + strlen($3) + 2);
+        sprintf(access, "%s.%s", $1, $3);
+        $$ = access;
+    }
+    | qualified_access DOT IDENTIFIER {
+        char *access = malloc(strlen($1) + strlen($3) + 2);
+        sprintf(access, "%s.%s", $1, $3);
+        free($1);
+        $$ = access;
+    }
+    | SYSTEM DOT OUT DOT PRINTLN {
+        $$ = strdup("System.out.println");
+    }
     ;
 
 argument_list:
@@ -547,20 +736,33 @@ statement:
     | while_statement
     | switch_statement
     | try_statement
-    | RETURN expression SEMICOLON
-    | RETURN SEMICOLON
-    | BREAK SEMICOLON
-    | CONTINUE SEMICOLON
-    | PRINTLN LPAREN println_args RPAREN SEMICOLON
-    | PRINT LPAREN println_args RPAREN SEMICOLON
-    
-    | IDENTIFIER LPAREN argument_list RPAREN SEMICOLON
-      | IDENTIFIER ASSIGN expression SEMICOLON {
-        if (!check_variable_declared(&symbol_table, $1, yylineno)) {
-            YYERROR;
-        }
+    | RETURN expression SEMICOLON {
+        add_quad(&quad_table, "return", $2.place, NULL, NULL);
     }
-
+    | RETURN SEMICOLON {
+        add_quad(&quad_table, "return", NULL, NULL, NULL);
+    }
+    | BREAK SEMICOLON {
+        add_quad(&quad_table, "break", NULL, NULL, NULL);
+    }
+    | CONTINUE SEMICOLON {
+        add_quad(&quad_table, "continue", NULL, NULL, NULL);
+    }
+    | PRINTLN LPAREN println_args RPAREN SEMICOLON {
+        add_quad(&quad_table, "println", $3.place ? $3.place : "null", NULL, NULL);
+    }
+    | PRINT LPAREN println_args RPAREN SEMICOLON {
+        add_quad(&quad_table, "print", $3.place ? $3.place : "null", NULL, NULL);
+    }
+    | IDENTIFIER LPAREN argument_list RPAREN SEMICOLON {
+        add_quad(&quad_table, "call", $1, NULL, NULL);
+    }
+    | IDENTIFIER ASSIGN expression SEMICOLON {
+        if (!check_variable_declared(&symbol_table, $1, yylineno)) {
+            yyerror("Variable non déclarée");
+        }
+        add_quad(&quad_table, ":=", $3.place, NULL, $1);
+    }
     ;
 
 declaration:
@@ -570,8 +772,9 @@ declaration:
     }
     | type IDENTIFIER ASSIGN expression {
         printf("Déclaration variable locale avec assignation : %s\n", $2);
-        check_assignment_type($1, $4);  // Vérification de compatibilité de type
+        check_assignment_type($1, $4);
         symbol_insert(&symbol_table, $2, SYM_VARIABLE, $1, 0, 0, NULL);
+        add_quad(&quad_table, ":=", $4.place, NULL, $2);
     }
     | type IDENTIFIER LBRACKET RBRACKET {
         printf("Déclaration tableau local : %s\n", $2);
@@ -580,23 +783,28 @@ declaration:
     | type IDENTIFIER LBRACKET RBRACKET ASSIGN array_init {
         printf("Déclaration tableau local avec initialisation : %s\n", $2);
         symbol_insert(&symbol_table, $2, SYM_VARIABLE, TYPE_ARRAY, 0, 0, NULL);
+        add_quad(&quad_table, ":=", $6.place, NULL, $2);
     }
     | type IDENTIFIER ASSIGN NEW IDENTIFIER LPAREN argument_list RPAREN {
         printf("Déclaration variable avec instanciation d'objet : %s\n", $2);
         symbol_insert(&symbol_table, $2, SYM_VARIABLE, TYPE_OBJECT, 0, 0, NULL);
+        char *temp = new_temp(&quad_table);
+        add_quad(&quad_table, "new", $5, NULL, temp);
+        add_quad(&quad_table, ":=", temp, NULL, $2);
     }
-    | type IDENTIFIER ASSIGN array_initializer {
+    | type IDENTIFIER ASSIGN array_init {
         printf("Déclaration tableau avec initialisation : %s\n", $2);
         symbol_insert(&symbol_table, $2, SYM_VARIABLE, TYPE_ARRAY, 0, 0, NULL);
+        add_quad(&quad_table, ":=", $4.place, NULL, $2);
     }
-;
-
+    ;
 
 block:
     LBRACE { enter_scope(&symbol_table); }
     statements 
     RBRACE { exit_scope(&symbol_table); }
-;
+    ;
+
 if_statement:
     IF LPAREN expression RPAREN statement
     | IF LPAREN expression RPAREN statement ELSE statement
@@ -671,15 +879,23 @@ finally_clause_opt:
     ;
 
 println_args:
-    /* empty */
-    | expression
-    | println_args COMMA expression
+    /* empty */ {
+        $$.type = NULL;
+        $$.place = NULL;
+    }
+    | expression {
+        $$ = $1;
+    }
+    | println_args COMMA expression {
+        $$ = $3;
+    }
     ;
 
 %%
 
 int main(int argc, char *argv[]) {
     init_symbol_table(&symbol_table);
+    init_quad_table(&quad_table);
     printf("Début du parsing\n");
 
     if (argc > 1) {
@@ -688,7 +904,6 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "Impossible d'ouvrir le fichier %s\n", argv[1]);
             return 1;
         }
-
         yyin = source_code;
         yyparse();
         fclose(source_code);
@@ -698,5 +913,7 @@ int main(int argc, char *argv[]) {
     }
 
     print_symbol_table(&symbol_table);
+    print_quads(&quad_table);
+    free_quad_table(&quad_table);
     return 0;
 }

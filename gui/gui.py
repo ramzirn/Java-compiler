@@ -16,12 +16,10 @@ class PerfectLineNumbers(tk.Canvas):
             highlightthickness=0
         )
         
-        # Configuration des événements
         self.text_widget.bind('<Configure>', self.update)
         self.text_widget.bind('<KeyRelease>', self.update)
         self.bind('<Configure>', self.update)
         
-        # Synchronisation du défilement
         self.text_widget.bind('<MouseWheel>', self.sync_scroll)
         self.text_widget.bind('<Button-4>', self.sync_scroll)  # Linux
         self.text_widget.bind('<Button-5>', self.sync_scroll)  # Linux
@@ -32,17 +30,15 @@ class PerfectLineNumbers(tk.Canvas):
         """Mise à jour des numéros de ligne"""
         self.delete('all')
         
-        # Obtenir les lignes visibles
         first_visible = self.text_widget.index('@0,0')
         last_visible = self.text_widget.index(f'@0,{self.winfo_height()}')
         
         start_line = int(float(first_visible))
         end_line = int(float(last_visible)) + 1
         
-        # Afficher les numéros
         for line in range(start_line, end_line + 1):
             bbox = self.text_widget.bbox(f'{line}.0')
-            if bbox:  # Si la ligne existe
+            if bbox:  
                 y_pos = bbox[1]
                 self.create_text(
                     40, y_pos,
@@ -54,9 +50,9 @@ class PerfectLineNumbers(tk.Canvas):
     
     def sync_scroll(self, event):
         """Synchronisation du défilement"""
-        if event.num == 4 or event.delta > 0:  # Défilement vers le haut
+        if event.num == 4 or event.delta > 0:  
             self.text_widget.yview_scroll(-1, 'units')
-        else:  # Défilement vers le bas
+        else:  
             self.text_widget.yview_scroll(1, 'units')
         
         self.update()
@@ -68,24 +64,19 @@ class CompilerGUI:
         self.root.title("JavaCompiler")
         self.root.geometry("900x700")
         
-        # Configuration
         self.compiler_path = "./javacompiler"
         self.current_file = None
         
-        # Initialisation de l'interface
         self.create_widgets()
         
-        # Vérification du compilateur
         if not Path(self.compiler_path).exists():
             messagebox.showwarning("Attention", "Compilateur introuvable!")
 
     def create_widgets(self):
         """Création de tous les widgets"""
-        # Barre d'outils
         toolbar = tk.Frame(self.root, bg='#e0e0e0', bd=1, relief=tk.RAISED)
         toolbar.pack(fill=tk.X, pady=(0, 5))
         
-        # Boutons (définis avant d'être utilisés)
         self.open_button = tk.Button(toolbar, text="Ouvrir", command=self.open_file)
         self.open_button.pack(side=tk.LEFT, padx=2)
         
@@ -96,11 +87,9 @@ class CompilerGUI:
                                      bg='#4CAF50', fg='white')
         self.compile_button.pack(side=tk.LEFT, padx=2)
         
-        # Cadre principal
         main_frame = tk.Frame(self.root)
         main_frame.pack(fill=tk.BOTH, expand=True)
         
-        # Éditeur de code
         self.text_editor = tk.Text(
             main_frame,
             font=('Consolas', 12),
@@ -111,21 +100,17 @@ class CompilerGUI:
             wrap=tk.WORD
         )
         
-        # Numéros de ligne
         self.line_numbers = PerfectLineNumbers(
             main_frame,
             text_widget=self.text_editor,
             width=50
         )
         
-        # Disposition
         self.line_numbers.pack(side=tk.LEFT, fill=tk.Y)
         self.text_editor.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
-        # Configuration du surlignage
         self.text_editor.tag_config('error', background='#ffdddd')
         
-        # Console de sortie
         self.console = scrolledtext.ScrolledText(
             self.root,
             font=('Consolas', 11),
@@ -136,7 +121,7 @@ class CompilerGUI:
         )
         self.console.pack(fill=tk.BOTH)
         
-        # Tags pour la console
+        
         self.console.tag_config('error', foreground='#ff5555')
         self.console.tag_config('success', foreground='#55ff55')
 
@@ -188,10 +173,10 @@ class CompilerGUI:
         
         temp_file = Path("temp_compile.java")
         try:
-            # Écrire dans un fichier temporaire
+           
             temp_file.write_text(code, encoding='utf-8')
             
-            # Exécuter le compilateur
+            
             result = subprocess.run(
                 [self.compiler_path, str(temp_file)],
                 capture_output=True,
@@ -199,13 +184,11 @@ class CompilerGUI:
                 encoding='utf-8'
             )
             
-            # Traiter les résultats
             self.process_results(result.returncode, result.stdout, result.stderr)
             
         except Exception as e:
             messagebox.showerror("Erreur", f"Échec de la compilation:\n{str(e)}")
         finally:
-            # Nettoyer le fichier temporaire
             if temp_file.exists():
                 temp_file.unlink()
 
@@ -214,7 +197,6 @@ class CompilerGUI:
         output = stderr if stderr else stdout
         success = returncode == 0
         
-        # Mettre à jour la console
         self.console.config(state='normal')
         self.console.delete('1.0', 'end')
         self.console.insert('end', "SUCCÈS!\n" if success else "ERREURS:\n", 
@@ -223,7 +205,6 @@ class CompilerGUI:
         self.console.config(state='disabled')
         self.console.see('end')
         
-        # Surligner les erreurs
         if not success:
             self.highlight_errors(output)
 
@@ -231,19 +212,16 @@ class CompilerGUI:
         """Surligner les lignes avec erreurs"""
         error_lines = set()
         
-        # Détecter les numéros de ligne dans les erreurs
         pattern = re.compile(r'line\s+(\d+)|ligne\s+(\d+)', re.IGNORECASE)
         for match in pattern.finditer(error_output):
             line_num = int(match.group(1) or match.group(2))
             error_lines.add(line_num)
         
-        # Appliquer le surlignage
         for line in sorted(error_lines):
             start = f"{line}.0"
             end = f"{line}.end"
             self.text_editor.tag_add('error', start, end)
             
-            # Défilement vers la première erreur
             if line == min(error_lines):
                 self.text_editor.see(start)
 

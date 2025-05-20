@@ -1,44 +1,31 @@
 #ifndef QUADS_H
 #define QUADS_H
 
-typedef enum {
-    Q_ASSIGN,       // =
-    Q_PLUS,         // +
-    Q_MINUS,        // -
-    Q_MULT,         // *
-    Q_DIV,          // /
-    Q_GOTO,         // goto
-    Q_IF_LT,        // if <
-    Q_IF_GT,        // if >
-    Q_IF_EQ,        // if ==
-    Q_IF_NEQ,       // if !=
-    Q_LABEL,        // label
-    Q_PARAM,        // param
-    Q_CALL,         // call
-    Q_RETURN,       // return
-    Q_INDEX,        // array index
-    Q_PRINT         // print
-} QuadOp;
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-typedef struct Quadruplet {
-    QuadOp op;
-    char *arg1;
-    char *arg2;
-    char *result;
-    struct Quadruplet *next;
-} Quadruplet;
+// Structure pour un quadruplet
+typedef struct Quad {
+    char *op;       // Opérateur (e.g., "+", ":=", "goto")
+    char *arg1;     // Premier opérande
+    char *arg2;     // Deuxième opérande
+    char *result;   // Résultat
+} Quad;
 
-typedef struct {
-    Quadruplet *head;
-    Quadruplet *tail;
-    int temp_count;
-    int label_count;
-} IntermediateCode;
+// Structure pour gérer la liste des quadruplets
+typedef struct QuadTable {
+    Quad *quads;        // Tableau dynamique de quadruplets
+    int quad_count;     // Nombre de quadruplets
+    int quad_capacity;  // Capacité du tableau
+    int temp_count;     // Compteur pour variables temporaires
+} QuadTable;
 
-// Fonctions pour gérer le code intermédiaire
-IntermediateCode* create_intermediate_code();
-void emit(IntermediateCode *ic, QuadOp op, char *arg1, char *arg2, char *result);
-void print_quads(IntermediateCode *ic, FILE *output);
-void free_intermediate_code(IntermediateCode *ic);
+// Fonctions pour gérer les quadruplets
+void init_quad_table(QuadTable *qt);
+void add_quad(QuadTable *qt, const char *op, const char *arg1, const char *arg2, const char *result);
+char *new_temp(QuadTable *qt);
+void print_quads(QuadTable *qt);
+void free_quad_table(QuadTable *qt);
 
-#endif
+#endif // QUADS_H

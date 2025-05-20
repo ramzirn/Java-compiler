@@ -1,76 +1,73 @@
 #include "quads.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
-IntermediateCode* create_intermediate_code() {
-    IntermediateCode *ic = malloc(sizeof(IntermediateCode));
-    ic->head = NULL;
-    ic->tail = NULL;
-    ic->temp_count = 0;
-    ic->label_count = 0;
-    return ic;
-}
-
-void emit(IntermediateCode *ic, QuadOp op, char *arg1, char *arg2, char *result) {
-    Quadruplet *quad = malloc(sizeof(Quadruplet));
-    quad->op = op;
-    quad->arg1 = arg1 ? strdup(arg1) : NULL;
-    quad->arg2 = arg2 ? strdup(arg2) : NULL;
-    quad->result = result ? strdup(result) : NULL;
-    quad->next = NULL;
-
-    if (ic->tail == NULL) {
-        ic->head = ic->tail = quad;
-    } else {
-        ic->tail->next = quad;
-        ic->tail = quad;
+// Initialisation de la table des quadruplets
+void init_quad_table(QuadTable *qt) {
+    qt->quad_capacity = 100; // Capacité initiale
+    qt->quads = (Quad *)malloc(qt->quad_capacity * sizeof(Quad));
+    if (!qt->quads) {
+        fprintf(stderr, "Erreur : échec de l'allocation pour la table des quadruplets\n");
+        exit(1);
     }
+    qt->quad_count = 0;
+    qt->temp_count = 0;
 }
 
-
-
-void print_quads(IntermediateCode *ic, FILE *output) {
-    Quadruplet *current = ic->head;
-    while (current != NULL) {
-        fprintf(output, "(");
-        switch(current->op) {
-            case Q_ASSIGN: fprintf(output, "="); break;
-            case Q_PLUS: fprintf(output, "+"); break;
-            case Q_MINUS: fprintf(output, "-"); break;
-            case Q_MULT: fprintf(output, "*"); break;
-            case Q_DIV: fprintf(output, "/"); break;
-            case Q_GOTO: fprintf(output, "goto"); break;
-            case Q_IF_LT: fprintf(output, "if<"); break;
-            case Q_IF_GT: fprintf(output, "if>"); break;
-            case Q_IF_EQ: fprintf(output, "if=="); break;
-            case Q_IF_NEQ: fprintf(output, "if!="); break;
-            case Q_LABEL: fprintf(output, "label"); break;
-            case Q_PARAM: fprintf(output, "param"); break;
-            case Q_CALL: fprintf(output, "call"); break;
-            case Q_RETURN: fprintf(output, "return"); break;
-            case Q_INDEX: fprintf(output, "index"); break;
-            case Q_PRINT: fprintf(output, "print"); break;
+// Ajouter un quadruplet
+void add_quad(QuadTable *qt, const char *op, const char *arg1, const char *arg2, const char *result) {
+    if (qt->quad_count >= qt->quad_capacity) {
+        qt->quad_capacity *= 2;
+        qt->quads = (Quad *)realloc(qt->quads, qt->quad_capacity * sizeof(Quad));
+        if (!qt->quads) {
+            fprintf(stderr, "Erreur : échec de la réallocation pour la table des quadruplets\n");
+            exit(1);
         }
-        
-        fprintf(output, ", %s, %s, %s)\n",
-                current->arg1 ? current->arg1 : "_",
-                current->arg2 ? current->arg2 : "_",
-                current->result ? current->result : "_");
-        
-        current = current->next;
     }
+    Quad *q = &qt->quads[qt->quad_count++];
+    q->op = strdup(op);
+    q->arg1 = arg1 ? strdup(arg1) : NULL;
+    q->arg2 = arg2 ? strdup(arg2) : NULL;
+    q->result = result ? strdup(result) : NULL;
 }
 
-void free_intermediate_code(IntermediateCode *ic) {
-    Quadruplet *current = ic->head;
-    while (current != NULL) {
-        Quadruplet *next = current->next;
-        if (current->arg1) free(current->arg1);
-        if (current->arg2) free(current->arg2);
-        if (current->result) free(current->result);
-        free(current);
-        current = next;
+// Générer un nouveau temporaire
+char *new_temp(QuadTable *qt) {
+    char *temp = (char *)malloc(10);
+    if (!temp) {
+        fprintf(stderr, "Erreur : échec de l'allocation pour un temporaire\n");
+        exit(1);
     }
-    free(ic);
+    snprintf(temp, 10, "t%d", qt->temp_count++);
+    return temp;
+}
+
+// Afficher les quadruplets
+void print_quads(QuadTable *qt) {
+    printf("\n===== QUADRUPLETS =====\n");
+    printf("%-10s %-15s %-15s %-15s\n", "Op", "Arg1", "Arg2", "Result");
+    printf("--------------------------------------------\n");
+    for (int i = 0; i < qt->quad_count; i++) {
+        Quad *q = &qt->quads[i];
+        printf("%-10s %-15s %-15s %-15s\n", 
+               q->op, 
+               q->arg1 ? q->arg1 : "-", 
+               q->arg2 ? q->arg2 : "-", 
+               q->result ? q->result : "-");
+    }
+    printf("=======================\n\n");
+}
+
+// Libérer la table des quadruplets
+void free_quad_table(QuadTable *qt) {
+    for (int i = 0; i < qt->quad_count; i++) {
+        Quad *q = &qt->quads[i];
+        free(q->op);
+        if (q->arg1) free(q->arg1);
+        if (q->arg2) free(q->arg2);
+        if (q->result) free(q->result);
+    }
+    free(qt->quads);
+    qt->quads = NULL;
+    qt->quad_count = 0;
+    qt->quad_capacity = 0;
+    qt->temp_count = 0;
 }
