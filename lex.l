@@ -85,6 +85,7 @@ extern int yylineno;
 "-="    { return MINUS_ASSIGN; }
 "*="    { return TIMES_ASSIGN; }
 "/="    { return DIVIDE_ASSIGN; }
+"%"         { return MOD; }
 
 [0-9]+         { yylval.num = atoi(yytext); return INTEGER_LITERAL; }
 [0-9]+\.[0-9]+ { yylval.dbl = atof(yytext); return DOUBLE_LITERAL; }

@@ -45,7 +45,7 @@ void yyerror(const char *s) {
 %token IF ELSE FOR WHILE SWITCH CASE DEFAULT TRY CATCH FINALLY
 %token EXTENDS IMPLEMENTS NEW THIS SUPER RETURN BREAK CONTINUE
 %token LBRACE RBRACE LPAREN RPAREN LBRACKET RBRACKET SEMICOLON COMMA DOT COLON STAR 
-%token PLUS MINUS TIMES DIVIDE ASSIGN PLUS_ASSIGN MINUS_ASSIGN TIMES_ASSIGN DIVIDE_ASSIGN
+%token PLUS MINUS TIMES DIVIDE MOD ASSIGN PLUS_ASSIGN MINUS_ASSIGN TIMES_ASSIGN DIVIDE_ASSIGN
 %token EQ NEQ LT GT LTE GTE AND OR NOT
 %token PRIVATE PROTECTED FINAL 
 %token SYSTEM OUT PRINTLN PRINT
@@ -57,7 +57,7 @@ void yyerror(const char *s) {
 %left LT GT LTE GTE
 %left PLUS MINUS
 %right CAST
-%left TIMES DIVIDE
+%left TIMES DIVIDE MOD
 %right NOT
 %nonassoc UMINUS
 %right ASSIGN PLUS_ASSIGN MINUS_ASSIGN TIMES_ASSIGN DIVIDE_ASSIGN
@@ -67,6 +67,7 @@ void yyerror(const char *s) {
 %type <expr> expression primary_expression assignment array_creation
 %type <expr> array_access method_invocation cast_expression unary_expression
 %type <expr> postfix_expression array_init println_args
+%type <expr> for_init_opt for_cond_opt for_update_opt for_init expression_list
 %type <str> qualified_name qualified_access
 
 %start program
@@ -261,6 +262,14 @@ expression:
         $$.type = $1.type;
         $$.place = new_temp(&quad_table);
         add_quad(&quad_table, "/", $1.place, $3.place, $$.place);
+    }
+    | expression MOD expression {
+        if (!check_type_compatibility($1.type, $3.type)) {
+            yyerror("Incompatibilité de types dans l'opération '%'");
+        }
+        $$.type = $1.type;
+        $$.place = new_temp(&quad_table);
+        add_quad(&quad_table, "%", $1.place, $3.place, $$.place);
     }
     | expression GT expression {
         if (!check_type_compatibility($1.type, $3.type)) {
@@ -662,8 +671,8 @@ array_dimensions:
     ;
 
 expression_list:
-    expression
-    | expression_list COMMA expression
+    expression { $$ = $1; }
+    | expression_list COMMA expression { $$ = $3; }
     ;
 
 method_invocation:
@@ -831,31 +840,62 @@ if_statement:
     ;
 
 for_statement:
-    FOR LPAREN for_init_opt SEMICOLON for_cond_opt SEMICOLON for_update_opt RPAREN statement
+    FOR LPAREN for_init_opt SEMICOLON for_cond_opt SEMICOLON for_update_opt RPAREN {
+        if ($5.type && strcmp($5.type, "boolean") != 0) {
+            yyerror("L'expression de condition du for doit être booléenne");
+        }
+        char *label_start = new_label(&quad_table);
+        char *label_end = new_label(&quad_table);
+        // Étiquette pour le début de la boucle
+        add_quad(&quad_table, "label", label_start, NULL, NULL);
+        // Test de la condition
+        if ($5.place) {
+            add_quad(&quad_table, "if_false", $5.place, label_end, NULL);
+        }
+        // Sauvegarder les étiquettes pour le statement
+        $<expr>$.place = label_start; // Pour goto
+        $<expr>$.type = label_end;   // Pour fin
+    }
+    statement {
+        // Incrémentation (for_update_opt $7, déjà généré)
+        // Saut au début de la boucle
+        add_quad(&quad_table, "goto", $<expr>9.place, NULL, NULL);
+        // Étiquette pour la fin de la boucle
+        add_quad(&quad_table, "label", $<expr>9.type, NULL, NULL);
+    }
+    ;
+
+for_init_opt:
+    /* empty */ {
+        $$.place = NULL;
+        $$.type = NULL;
+    }
+    | for_init { $$ = $1; }
+    ;
+
+for_cond_opt:
+    /* empty */ {
+        $$.place = NULL;
+        $$.type = strdup("boolean");
+    }
+    | expression { $$ = $1; }
+    ;
+
+for_update_opt:
+    /* empty */ {
+        $$.place = NULL;
+        $$.type = NULL;
+    }
+    | expression_list { $$ = $1; }
+    ;
+
+for_init:
+    declaration { $$.place = NULL; $$.type = NULL; }
+    | expression_list { $$ = $1; }
     ;
 
 enhanced_for_statement:
     FOR LPAREN type IDENTIFIER COLON expression RPAREN statement
-    ;
-
-for_init_opt:
-    /* empty */
-    | for_init
-    ;
-
-for_init:
-    declaration
-    | expression_list
-    ;
-
-for_cond_opt:
-    /* empty */
-    | expression
-    ;
-
-for_update_opt:
-    /* empty */
-    | expression_list
     ;
 
 while_statement:

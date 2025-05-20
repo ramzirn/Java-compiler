@@ -1,0 +1,3 @@
+done :
+-operations arithmetiques 
+- if else 
