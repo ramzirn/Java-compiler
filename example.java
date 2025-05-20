@@ -1,9 +1,10 @@
-public class Test2 {
+public class Test {
     public static void main(String[] args) {
-        for (int i = 0; i < 5; i++) {
-            if (i % 2 == 0) {
-                System.out.println(i);
-            }
+        int x = 2;
+        switch (x) {
+            case 1: System.out.println("Un"); break;
+            case 2: System.out.println("Deux"); break;
+            default: System.out.println("Autre");
         }
     }
 }

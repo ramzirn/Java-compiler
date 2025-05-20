@@ -899,11 +899,36 @@ enhanced_for_statement:
     ;
 
 while_statement:
-    WHILE LPAREN expression RPAREN statement
+    WHILE LPAREN expression RPAREN statement {
+        if (strcmp($3.type, "boolean") != 0) {
+            yyerror("L'expression du while doit être booléenne");
+        }
+        char *label_start = new_label(&quad_table);
+        char *label_end = new_label(&quad_table);
+        // Étiquette pour le début de la boucle
+        add_quad(&quad_table, "label", label_start, NULL, NULL);
+        // Test de la condition
+        add_quad(&quad_table, "if_false", $3.place, label_end, NULL);
+        // Sauvegarder les étiquettes pour le statement (pour break/continue)
+        $<expr>$.place = label_start; // Pour continue
+        $<expr>$.type = label_end;   // Pour break
+        // Corps de la boucle (statement $5)
+        // Saut au début de la boucle
+        add_quad(&quad_table, "goto", label_start, NULL, NULL);
+        // Étiquette pour la fin de la boucle
+        add_quad(&quad_table, "label", label_end, NULL, NULL);
+    }
     ;
-
 switch_statement:
-    SWITCH LPAREN expression RPAREN switch_block
+    SWITCH LPAREN expression RPAREN switch_block {
+        if (strcmp($3.type, "int") != 0) {
+            yyerror("L'expression du switch doit être de type int");
+        }
+        char *label_end = new_label(&quad_table);
+        $<expr>$.type = label_end; // Pour break
+        // Le switch_block ($5) contient les comparaisons et statements
+        add_quad(&quad_table, "label", label_end, NULL, NULL);
+    }
     ;
 
 switch_block:
@@ -916,10 +941,21 @@ switch_cases:
     ;
 
 switch_case:
-    CASE expression COLON statements
-    | DEFAULT COLON statements
+    CASE expression COLON statements {
+        if (strcmp($2.type, "int") != 0) {
+            yyerror("L'expression du case doit être de type int");
+        }
+        char *label_next = new_label(&quad_table);
+        add_quad(&quad_table, "if_neq", $<expr>-2.place, $2.place, label_next);
+        // Les statements ($4) sont exécutés si la comparaison est vraie
+        add_quad(&quad_table, "label", label_next, NULL, NULL);
+    }
+    | DEFAULT COLON statements {
+        // Pas de comparaison pour default, exécuter directement les statements
+        char *label_next = new_label(&quad_table);
+        add_quad(&quad_table, "label", label_next, NULL, NULL);
+    }
     ;
-
 try_statement:
     TRY block catch_clauses finally_clause_opt
     ;
