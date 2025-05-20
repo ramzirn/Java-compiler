@@ -130,12 +130,37 @@ void simplify_algebraic(QuadTable *table) {
         Quad *q = table->quads[i];
         if (q->op && q->arg1 && q->arg2 && q->result) {
             if ((strcmp(q->op, "+") == 0 || strcmp(q->op, "-") == 0) && strcmp(q->arg2, "0") == 0) {
+                char *value = q->arg1;
+                char *temp = q->result;
+                // Transformer en assignation
                 free(q->op);
                 q->op = strdup(":=");
                 free(q->arg2);
                 q->arg2 = NULL;
-                // Conserver arg1 comme source, result comme destination
-                // Pas besoin de modifier arg1 ou result
+                // Vérifier si la temporaire est utilisée dans une assignation directe
+                if (i + 1 < table->quad_count) {
+                    Quad *next = table->quads[i + 1];
+                    if (next->op && strcmp(next->op, ":=") == 0 && next->arg1 && strcmp(next->arg1, temp) == 0 && next->result) {
+                        // Propager la valeur directement dans l'assignation suivante
+                        free(next->arg1);
+                        next->arg1 = strdup(value);
+                        // Propager la valeur dans les quadruplets suivants
+                        for (int j = i + 2; j < table->quad_count; j++) {
+                            Quad *future = table->quads[j];
+                            if (future->arg1 && strcmp(future->arg1, temp) == 0) {
+                                free(future->arg1);
+                                future->arg1 = strdup(value);
+                            }
+                            if (future->arg2 && strcmp(future->arg2, temp) == 0) {
+                                free(future->arg2);
+                                future->arg2 = strdup(value);
+                            }
+                        }
+                        // Marquer le quadruplet actuel comme NOP
+                        free(q->op);
+                        q->op = strdup("NOP");
+                    }
+                }
             }
         }
     }
@@ -146,6 +171,8 @@ void simplify_algebraic(QuadTable *table) {
 #include <string.h>
 #include <stdlib.h>
 #include "quads.h"
+
+
 
 bool is_used(QuadTable *table, int start, const char *var) {
     for (int i = start; i < table->quad_count; i++) {
@@ -167,7 +194,7 @@ void propagate_copies(QuadTable *table) {
         if (q->op && strcmp(q->op, ":=") == 0 && q->arg1 && q->result) {
             char *temp = q->result;
             char *value = q->arg1;
-            // Propager uniquement si result est une temporaire ou si la variable est peu utilisée
+            bool is_temp = is_temporary(temp);
             for (int j = i + 1; j < table->quad_count; j++) {
                 Quad *next = table->quads[j];
                 if (next->result && strcmp(next->result, temp) == 0) break;
@@ -180,10 +207,24 @@ void propagate_copies(QuadTable *table) {
                     next->arg2 = strdup(value);
                 }
             }
-            // Marquer comme NOP uniquement si temp est une temporaire et peu utilisée
-            if (is_temporary(temp) && !is_used(table, i + 1, temp)) {
-                free(q->op);
-                q->op = strdup("NOP");
+            // Marquer comme NOP si temp est une temporaire utilisée dans une assignation directe
+            if (is_temp && is_used(table, i + 1, temp)) {
+                int use_count = 0;
+                bool is_direct_assign = false;
+                for (int j = i + 1; j < table->quad_count; j++) {
+                    Quad *next = table->quads[j];
+                    if ((next->arg1 && strcmp(next->arg1, temp) == 0) || 
+                        (next->arg2 && strcmp(next->arg2, temp) == 0)) {
+                        use_count++;
+                    }
+                    if (next->op && strcmp(next->op, ":=") == 0 && next->arg1 && strcmp(next->arg1, temp) == 0) {
+                        is_direct_assign = true;
+                    }
+                }
+                if (use_count == 1 && is_direct_assign) {
+                    free(q->op);
+                    q->op = strdup("NOP");
+                }
             }
         }
     }
@@ -192,7 +233,8 @@ void remove_dead_code(QuadTable *table) {
     int new_count = 0;
     for (int i = 0; i < table->quad_count; i++) {
         Quad *q = table->quads[i];
-        if (q->op && strcmp(q->op, "NOP") == 0) {
+        if (q->op && (strcmp(q->op, "NOP") == 0 || 
+                     (q->result && is_temporary(q->result) && !is_used(table, i + 1, q->result)))) {
             if (q->op) free(q->op);
             if (q->arg1) free(q->arg1);
             if (q->arg2) free(q->arg2);

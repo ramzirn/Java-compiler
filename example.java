@@ -1,8 +1,7 @@
-public class TestOptimizations5 {
+public class TestOptimizations7 {
     public static void main(String[] args) {
-        int a = 10;
-        int b = a + 0;
-        int c = b + 5;
-        int d = c - 0;
+        int p = 15;
+        int q = p + 0;
+        int r = q - 5;
     }
 }
