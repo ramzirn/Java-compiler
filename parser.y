@@ -806,8 +806,28 @@ block:
     ;
 
 if_statement:
-    IF LPAREN expression RPAREN statement
-    | IF LPAREN expression RPAREN statement ELSE statement
+    IF LPAREN expression RPAREN statement {
+        if (strcmp($3.type, "boolean") != 0) {
+            yyerror("L'expression du if doit être booléenne");
+        }
+        char *label_end = new_label(&quad_table);
+        add_quad(&quad_table, "if_false", $3.place, label_end, NULL);
+        // Le statement $5 est déjà généré
+        add_quad(&quad_table, "label", label_end, NULL, NULL);
+    }
+    | IF LPAREN expression RPAREN statement ELSE statement {
+        if (strcmp($3.type, "boolean") != 0) {
+            yyerror("L'expression du if doit être booléenne");
+        }
+        char *label_else = new_label(&quad_table);
+        char *label_end = new_label(&quad_table);
+        add_quad(&quad_table, "if_false", $3.place, label_else, NULL);
+        // Corps du if (statement $5)
+        add_quad(&quad_table, "goto", label_end, NULL, NULL);
+        add_quad(&quad_table, "label", label_else, NULL, NULL);
+        // Corps du else (statement $7)
+        add_quad(&quad_table, "label", label_end, NULL, NULL);
+    }
     ;
 
 for_statement:

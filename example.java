@@ -1,8 +1,10 @@
 public class Test {
     public static void main(String[] args) {
         int a = 5;
-        int b = 3;
-        int c = a + b;
-        System.out.println(c);
+        if (a > 3) {
+            System.out.println(a);
+        } else {
+            System.out.println("a <= 3");
+        }
     }
 }
