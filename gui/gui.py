@@ -116,7 +116,7 @@ class CompilerGUI:
             font=('Consolas', 11),
             bg='#1e1e1e',
             fg='white',
-            height=10,
+            height=50,
             state='disabled'
         )
         self.console.pack(fill=tk.BOTH)
@@ -193,20 +193,26 @@ class CompilerGUI:
                 temp_file.unlink()
 
     def process_results(self, returncode, stdout, stderr):
-        """Afficher les résultats de compilation"""
-        output = stderr if stderr else stdout
-        success = returncode == 0
-        
+        """Afficher les résultats de compilation (quadruples + erreurs)"""
         self.console.config(state='normal')
         self.console.delete('1.0', 'end')
-        self.console.insert('end', "SUCCÈS!\n" if success else "ERREURS:\n", 
-                          'success' if success else 'error')
-        self.console.insert('end', output)
+
+        # Afficher les quadruples (stdout) même en cas d'erreur
+        if stdout:
+            self.console.insert('end', "QUADRUPLETS:\n", 'success')
+            self.console.insert('end', stdout + "\n")
+
+        # Afficher les erreurs (stderr) si elles existent
+        if stderr:
+            self.console.insert('end', "ERREURS:\n", 'error')
+            self.console.insert('end', stderr)
+
         self.console.config(state='disabled')
         self.console.see('end')
-        
-        if not success:
-            self.highlight_errors(output)
+
+        # Surligner les erreurs dans l'éditeur
+        if stderr:
+            self.highlight_errors(stderr)
 
     def highlight_errors(self, error_output):
         """Surligner les lignes avec erreurs"""

@@ -1,6 +1,7 @@
 done :
--operations arithmetiques 
+-operations arithmetiques , affectations 
 - if else 
 -for 
 -while
 -switch 
+-methodes et leurs parametres 

@@ -31,6 +31,11 @@ void yyerror(const char *s) {
         char **names;
         DataType *types;
     } param_list;
+    struct {
+        int count;
+        char **places;
+        char **types;
+    } arg_list;
     ExprAttr expr;
 }
 
@@ -64,6 +69,7 @@ void yyerror(const char *s) {
 
 %type <num> type
 %type <param_list> param_list param_list_opt
+%type <arg_list> argument_list
 %type <expr> expression primary_expression assignment array_creation
 %type <expr> array_access method_invocation cast_expression unary_expression
 %type <expr> postfix_expression array_init println_args
@@ -162,14 +168,20 @@ method_decl:
         printf("Déclaration de fonction: nom = %s, type retour = %d, nb params = %d\n", $3, $2, $5.count);
         symbol_insert_function(&symbol_table, $3, $2, $5.count, $5.names, $5.types);
         enter_scope(&symbol_table);
+        char *label = malloc(strlen($3) + 10);
+        sprintf(label, "func_%s", $3);
+        add_quad(&quad_table, "label", label, NULL, NULL);
+        free(label);
         for (int i = 0; i < $5.count; ++i) {
-            Symbol *inserted = symbol_insert(&symbol_table, $5.names[i], SYM_VARIABLE, $5.types[i], 0, 0, NULL);
+            Symbol *inserted = symbol_insert(&symbol_table, $5.names[i], SYM_PARAMETER, $5.types[i], 0, 0, NULL);
             if (inserted) {
                 printf("Paramètre inséré : %s (Scope %d)\n", $5.names[i], symbol_table.current_scope);
+                add_quad(&quad_table, "param_receive", $5.names[i], NULL, NULL);
             }
         }
     }
     method_body {
+        add_quad(&quad_table, "return", NULL, NULL, NULL);
         exit_scope(&symbol_table);
     }
     ;
@@ -371,10 +383,22 @@ expression:
         $$ = $4;
     }
     | IDENTIFIER DOT IDENTIFIER LPAREN argument_list RPAREN {
-        $$.type = strdup("unknown");
-        $$.place = new_temp(&quad_table);
         char *method_call = malloc(strlen($1) + strlen($3) + 2);
         sprintf(method_call, "%s.%s", $1, $3);
+        Symbol *func = symbol_lookup_all(&symbol_table, method_call);
+        if (!func || func->sym_type != SYM_FUNCTION) {
+            yyerror("Méthode non déclarée");
+        }
+        if ($5.count != func->param_count) {
+            yyerror("Nombre d'arguments incorrect");
+        }
+        for (int i = 0; i < $5.count; i++) {
+            if (!check_type_compatibility($5.types[i], get_data_type_string(func->param_types[i]))) {
+                yyerror("Incompatibilité de type pour l'argument");
+            }
+        }
+        $$.type = get_data_type_string(func->data_type);
+        $$.place = new_temp(&quad_table);
         add_quad(&quad_table, "call", method_call, NULL, $$.place);
         free(method_call);
     }
@@ -447,10 +471,22 @@ primary_expression:
         add_quad(&quad_table, "cast", $5.place, NULL, $$.place);
     }
     | IDENTIFIER DOT IDENTIFIER LPAREN argument_list RPAREN {
-        $$.type = strdup("unknown");
-        $$.place = new_temp(&quad_table);
         char *method_call = malloc(strlen($1) + strlen($3) + 2);
         sprintf(method_call, "%s.%s", $1, $3);
+        Symbol *func = symbol_lookup_all(&symbol_table, method_call);
+        if (!func || func->sym_type != SYM_FUNCTION) {
+            yyerror("Méthode non déclarée");
+        }
+        if ($5.count != func->param_count) {
+            yyerror("Nombre d'arguments incorrect");
+        }
+        for (int i = 0; i < $5.count; i++) {
+            if (!check_type_compatibility($5.types[i], get_data_type_string(func->param_types[i]))) {
+                yyerror("Incompatibilité de type pour l'argument");
+            }
+        }
+        $$.type = get_data_type_string(func->data_type);
+        $$.place = new_temp(&quad_table);
         add_quad(&quad_table, "call", method_call, NULL, $$.place);
         free(method_call);
     }
@@ -495,10 +531,22 @@ postfix_expression:
         add_quad(&quad_table, "length", $1.place, NULL, $$.place);
     }
     | postfix_expression DOT IDENTIFIER LPAREN argument_list RPAREN {
-        $$.type = strdup("unknown");
-        $$.place = new_temp(&quad_table);
         char *method_call = malloc(strlen($1.place) + strlen($3) + 2);
         sprintf(method_call, "%s.%s", $1.place, $3);
+        Symbol *func = symbol_lookup_all(&symbol_table, method_call);
+        if (!func || func->sym_type != SYM_FUNCTION) {
+            yyerror("Méthode non déclarée");
+        }
+        if ($5.count != func->param_count) {
+            yyerror("Nombre d'arguments incorrect");
+        }
+        for (int i = 0; i < $5.count; i++) {
+            if (!check_type_compatibility($5.types[i], get_data_type_string(func->param_types[i]))) {
+                yyerror("Incompatibilité de type pour l'argument");
+            }
+        }
+        $$.type = get_data_type_string(func->data_type);
+        $$.place = new_temp(&quad_table);
         add_quad(&quad_table, "call", method_call, NULL, $$.place);
         free(method_call);
     }
@@ -677,20 +725,59 @@ expression_list:
 
 method_invocation:
     IDENTIFIER LPAREN argument_list RPAREN {
-        $$.type = strdup("unknown");
+        Symbol *func = symbol_lookup_all(&symbol_table, $1);
+        if (!func || func->sym_type != SYM_FUNCTION) {
+            yyerror("Méthode non déclarée");
+        }
+        if ($3.count != func->param_count) {
+            yyerror("Nombre d'arguments incorrect");
+        }
+        for (int i = 0; i < $3.count; i++) {
+            if (!check_type_compatibility($3.types[i], get_data_type_string(func->param_types[i]))) {
+                yyerror("Incompatibilité de type pour l'argument");
+            }
+        }
+        $$.type = get_data_type_string(func->data_type);
         $$.place = new_temp(&quad_table);
-        add_quad(&quad_table, "call", $1, NULL, $$.place);
+        char *func_label = malloc(strlen($1) + 10);
+        sprintf(func_label, "func_%s", $1);
+        add_quad(&quad_table, "call", func_label, NULL, $$.place);
+        free(func_label);
     }
     | qualified_access LPAREN argument_list RPAREN {
-        $$.type = strdup("unknown");
+        Symbol *func = symbol_lookup_all(&symbol_table, $1);
+        if (!func || func->sym_type != SYM_FUNCTION) {
+            yyerror("Méthode non déclarée");
+        }
+        if ($3.count != func->param_count) {
+            yyerror("Nombre d'arguments incorrect");
+        }
+        for (int i = 0; i < $3.count; i++) {
+            if (!check_type_compatibility($3.types[i], get_data_type_string(func->param_types[i]))) {
+                yyerror("Incompatibilité de type pour l'argument");
+            }
+        }
+        $$.type = get_data_type_string(func->data_type);
         $$.place = new_temp(&quad_table);
         add_quad(&quad_table, "call", $1, NULL, $$.place);
     }
     | primary_expression DOT IDENTIFIER LPAREN argument_list RPAREN {
-        $$.type = strdup("unknown");
-        $$.place = new_temp(&quad_table);
         char *method_call = malloc(strlen($1.place) + strlen($3) + 2);
         sprintf(method_call, "%s.%s", $1.place, $3);
+        Symbol *func = symbol_lookup_all(&symbol_table, method_call);
+        if (!func || func->sym_type != SYM_FUNCTION) {
+            yyerror("Méthode non déclarée");
+        }
+        if ($5.count != func->param_count) {
+            yyerror("Nombre d'arguments incorrect");
+        }
+        for (int i = 0; i < $5.count; i++) {
+            if (!check_type_compatibility($5.types[i], get_data_type_string(func->param_types[i]))) {
+                yyerror("Incompatibilité de type pour l'argument");
+            }
+        }
+        $$.type = get_data_type_string(func->data_type);
+        $$.place = new_temp(&quad_table);
         add_quad(&quad_table, "call", method_call, NULL, $$.place);
         free(method_call);
     }
@@ -714,9 +801,28 @@ qualified_access:
     ;
 
 argument_list:
-    /* empty */
-    | expression
-    | argument_list COMMA expression
+    /* empty */ {
+        $$.count = 0;
+        $$.places = NULL;
+        $$.types = NULL;
+    }
+    | expression {
+        $$.count = 1;
+        $$.places = malloc(sizeof(char*));
+        $$.types = malloc(sizeof(char*));
+        $$.places[0] = strdup($1.place);
+        $$.types[0] = strdup($1.type);
+        add_quad(&quad_table, "param", $1.place, NULL, NULL);
+    }
+    | argument_list COMMA expression {
+        $$ = $1;
+        $$.count++;
+        $$.places = realloc($$.places, $$.count * sizeof(char*));
+        $$.types = realloc($$.types, $$.count * sizeof(char*));
+        $$.places[$$.count-1] = strdup($3.place);
+        $$.types[$$.count-1] = strdup($3.type);
+        add_quad(&quad_table, "param", $3.place, NULL, NULL);
+    }
     ;
 
 method_body:
@@ -764,7 +870,22 @@ statement:
         add_quad(&quad_table, "print", $3.place ? $3.place : "null", NULL, NULL);
     }
     | IDENTIFIER LPAREN argument_list RPAREN SEMICOLON {
-        add_quad(&quad_table, "call", $1, NULL, NULL);
+        Symbol *func = symbol_lookup_all(&symbol_table, $1);
+        if (!func || func->sym_type != SYM_FUNCTION) {
+            yyerror("Méthode non déclarée");
+        }
+        if ($3.count != func->param_count) {
+            yyerror("Nombre d'arguments incorrect");
+        }
+        for (int i = 0; i < $3.count; i++) {
+            if (!check_type_compatibility($3.types[i], get_data_type_string(func->param_types[i]))) {
+                yyerror("Incompatibilité de type pour l'argument");
+            }
+        }
+        char *func_label = malloc(strlen($1) + 10);
+        sprintf(func_label, "func_%s", $1);
+        add_quad(&quad_table, "call", func_label, NULL, NULL);
+        free(func_label);
     }
     | IDENTIFIER ASSIGN expression SEMICOLON {
         if (!check_variable_declared(&symbol_table, $1, yylineno)) {
@@ -821,7 +942,6 @@ if_statement:
         }
         char *label_end = new_label(&quad_table);
         add_quad(&quad_table, "if_false", $3.place, label_end, NULL);
-        // Le statement $5 est déjà généré
         add_quad(&quad_table, "label", label_end, NULL, NULL);
     }
     | IF LPAREN expression RPAREN statement ELSE statement {
@@ -831,10 +951,8 @@ if_statement:
         char *label_else = new_label(&quad_table);
         char *label_end = new_label(&quad_table);
         add_quad(&quad_table, "if_false", $3.place, label_else, NULL);
-        // Corps du if (statement $5)
         add_quad(&quad_table, "goto", label_end, NULL, NULL);
         add_quad(&quad_table, "label", label_else, NULL, NULL);
-        // Corps du else (statement $7)
         add_quad(&quad_table, "label", label_end, NULL, NULL);
     }
     ;
@@ -846,21 +964,15 @@ for_statement:
         }
         char *label_start = new_label(&quad_table);
         char *label_end = new_label(&quad_table);
-        // Étiquette pour le début de la boucle
         add_quad(&quad_table, "label", label_start, NULL, NULL);
-        // Test de la condition
         if ($5.place) {
             add_quad(&quad_table, "if_false", $5.place, label_end, NULL);
         }
-        // Sauvegarder les étiquettes pour le statement
-        $<expr>$.place = label_start; // Pour goto
-        $<expr>$.type = label_end;   // Pour fin
+        $<expr>$.place = label_start;
+        $<expr>$.type = label_end;
     }
     statement {
-        // Incrémentation (for_update_opt $7, déjà généré)
-        // Saut au début de la boucle
         add_quad(&quad_table, "goto", $<expr>9.place, NULL, NULL);
-        // Étiquette pour la fin de la boucle
         add_quad(&quad_table, "label", $<expr>9.type, NULL, NULL);
     }
     ;
@@ -905,28 +1017,22 @@ while_statement:
         }
         char *label_start = new_label(&quad_table);
         char *label_end = new_label(&quad_table);
-        // Étiquette pour le début de la boucle
         add_quad(&quad_table, "label", label_start, NULL, NULL);
-        // Test de la condition
         add_quad(&quad_table, "if_false", $3.place, label_end, NULL);
-        // Sauvegarder les étiquettes pour le statement (pour break/continue)
-        $<expr>$.place = label_start; // Pour continue
-        $<expr>$.type = label_end;   // Pour break
-        // Corps de la boucle (statement $5)
-        // Saut au début de la boucle
+        $<expr>$.place = label_start;
+        $<expr>$.type = label_end;
         add_quad(&quad_table, "goto", label_start, NULL, NULL);
-        // Étiquette pour la fin de la boucle
         add_quad(&quad_table, "label", label_end, NULL, NULL);
     }
     ;
+
 switch_statement:
     SWITCH LPAREN expression RPAREN switch_block {
         if (strcmp($3.type, "int") != 0) {
             yyerror("L'expression du switch doit être de type int");
         }
         char *label_end = new_label(&quad_table);
-        $<expr>$.type = label_end; // Pour break
-        // Le switch_block ($5) contient les comparaisons et statements
+        $<expr>$.type = label_end;
         add_quad(&quad_table, "label", label_end, NULL, NULL);
     }
     ;
@@ -947,15 +1053,14 @@ switch_case:
         }
         char *label_next = new_label(&quad_table);
         add_quad(&quad_table, "if_neq", $<expr>-2.place, $2.place, label_next);
-        // Les statements ($4) sont exécutés si la comparaison est vraie
         add_quad(&quad_table, "label", label_next, NULL, NULL);
     }
     | DEFAULT COLON statements {
-        // Pas de comparaison pour default, exécuter directement les statements
         char *label_next = new_label(&quad_table);
         add_quad(&quad_table, "label", label_next, NULL, NULL);
     }
     ;
+
 try_statement:
     TRY block catch_clauses finally_clause_opt
     ;

@@ -3,7 +3,23 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-// Initialisation de la table des symboles
+// Fonction pour convertir DataType en chaîne de caractères
+char* get_data_type_string(DataType type) {
+    switch (type) {
+        case TYPE_INT: return strdup("int");
+        case TYPE_DOUBLE: return strdup("double");
+        case TYPE_CHAR: return strdup("char");
+        case TYPE_BOOLEAN: return strdup("boolean");
+        case TYPE_STRING: return strdup("String");
+        case TYPE_VOID: return strdup("void");
+        case TYPE_CLASS: return strdup("class");
+        case TYPE_ARRAY: return strdup("array");
+        case TYPE_OBJECT: return strdup("object");
+        default: return strdup("unknown");
+    }
+}
+
+// Reste du code de symbol_table.c (non modifié)
 void init_symbol_table(SymbolTable *st) {
     for (int i = 0; i < SYMBOL_TABLE_SIZE; i++) {
         st->table[i] = NULL;
@@ -11,7 +27,6 @@ void init_symbol_table(SymbolTable *st) {
     st->current_scope = 0;
 }
 
-// Fonction de hachage
 unsigned int hash(const char *name) {
     unsigned int hashval = 0;
     for (; *name != '\0'; name++) {
@@ -20,26 +35,23 @@ unsigned int hash(const char *name) {
     return hashval % SYMBOL_TABLE_SIZE;
 }
 
-
 Symbol *symbol_insert_function(SymbolTable *st, const char *name, 
     DataType return_type, int param_count, 
     char **param_names, DataType *param_types) {
-Symbol *s = symbol_insert(st, name, SYM_FUNCTION, return_type, 0, -1, NULL);
-if (s == NULL) return NULL;
+    Symbol *s = symbol_insert(st, name, SYM_FUNCTION, return_type, 0, -1, NULL);
+    if (s == NULL) return NULL;
 
-s->param_count = param_count;
-s->param_names = param_names;
-s->param_types = param_types;
+    s->param_count = param_count;
+    s->param_names = param_names;
+    s->param_types = param_types;
 
-return s;
+    return s;
 }
 
-// Recherche d'un symbole dans la table
 Symbol *symbol_lookup(SymbolTable *st, const char *name, int current_scope) {
     unsigned int hashval = hash(name);
     Symbol *s = st->table[hashval];
     
-    // Recherche dans la chaîne de collision
     while (s != NULL) {
         if (strcmp(s->name, name) == 0 && s->scope_level <= current_scope) {
             return s;
@@ -47,28 +59,23 @@ Symbol *symbol_lookup(SymbolTable *st, const char *name, int current_scope) {
         s = s->next;
     }
     
-    return NULL; // Symbole non trouvé
+    return NULL;
 }
 
-// Insertion d'un nouveau symbole
 Symbol *symbol_insert(SymbolTable *st, const char *name, SymbolType sym_type, 
                      DataType data_type, int is_constant, int array_size, 
                      const char *class_name) {
-    // Vérifier si le symbole existe déjà dans le scope courant
     Symbol *s = symbol_lookup(st, name, st->current_scope);
     if (s != NULL && s->scope_level == st->current_scope) {
         fprintf(stderr, "Erreur sémantique : la variable '%s' est déjà déclarée dans le scope %d\n", name, st->current_scope);
         return NULL;
     }
     
-    
-    // Allocation du nouveau symbole
     Symbol *new_sym = (Symbol *)malloc(sizeof(Symbol));
     if (new_sym == NULL) {
-        return NULL; // Erreur d'allocation
+        return NULL;
     }
     
-    // Initialisation des champs
     new_sym->name = strdup(name);
     new_sym->sym_type = sym_type;
     new_sym->data_type = data_type;
@@ -77,13 +84,13 @@ Symbol *symbol_insert(SymbolTable *st, const char *name, SymbolType sym_type,
     new_sym->array_size = array_size;
     new_sym->class_name = class_name ? strdup(class_name) : NULL;
     
-    // Insertion dans la table de hachage
     unsigned int hashval = hash(name);
     new_sym->next = st->table[hashval];
     st->table[hashval] = new_sym;
     printf("Insertion: %s, Type: %d, Scope: %d\n", name, sym_type, st->current_scope);
     return new_sym;
 }
+
 Symbol *symbol_lookup_all(SymbolTable *st, const char *name) {
     for (int scope = st->current_scope; scope >= 0; scope--) {
         Symbol *s = symbol_lookup(st, name, scope);
@@ -91,37 +98,32 @@ Symbol *symbol_lookup_all(SymbolTable *st, const char *name) {
             return s;
         }
     }
-    return NULL; // Non trouvé dans aucun scope
+    return NULL;
 }
 
-// Suppression d'un symbole
 void symbol_remove(SymbolTable *st, const char *name) {
     unsigned int hashval = hash(name);
     Symbol *prev = NULL;
     Symbol *s = st->table[hashval];
     
-    // Recherche dans la chaîne de collision
     while (s != NULL && strcmp(s->name, name) != 0) {
         prev = s;
         s = s->next;
     }
     
-    if (s == NULL) return; // Symbole non trouvé
+    if (s == NULL) return;
     
-    // Réorganisation de la chaîne
     if (prev == NULL) {
         st->table[hashval] = s->next;
     } else {
         prev->next = s->next;
     }
     
-    // Libération de la mémoire
     free(s->name);
     if (s->class_name) free(s->class_name);
     free(s);
 }
 
-// Affichage de la table des symboles
 void print_symbol_table(SymbolTable *st) {
     printf("\n===== TABLE DES SYMBOLES =====\n");
     printf("%-20s %-12s %-12s %-8s %-10s %-8s %-10s\n", 
@@ -152,17 +154,14 @@ void print_symbol_table(SymbolTable *st) {
                 case TYPE_CLASS: data_type_str = s->class_name ? s->class_name : "class"; break;
                 case TYPE_ARRAY: data_type_str = "array"; break;
                 case TYPE_OBJECT: data_type_str = "objet"; break;
-
                 default: data_type_str = "inconnu"; break;
             }
 
-            // Afficher les symboles classiques
             printf("%-20s %-12s %-12s %-8d %-10s %-8d %-10s\n", 
                    s->name, sym_type_str, data_type_str, s->scope_level,
                    s->is_constant ? "oui" : "non", s->array_size,
                    s->class_name ? s->class_name : "-");
             
-            // Si c'est une fonction, afficher les paramètres associés
             if (s->sym_type == SYM_FUNCTION && s->param_names != NULL) {
                 for (int i = 0; i < s->param_count; i++) {
                     const char *param_data_type_str;
@@ -175,8 +174,7 @@ void print_symbol_table(SymbolTable *st) {
                         case TYPE_VOID: param_data_type_str = "void"; break;
                         case TYPE_CLASS: param_data_type_str = s->class_name ? s->class_name : "class"; break;
                         case TYPE_ARRAY: param_data_type_str = "array"; break;
-                        case TYPE_OBJECT: data_type_str = "objet"; break;
-
+                        case TYPE_OBJECT: param_data_type_str = "objet"; break;
                         default: param_data_type_str = "inconnu"; break;
                     }
                     printf("%-20s %-12s %-12s %-8d %-10s %-8d %-10s (Paramètre de Fonction)\n",
@@ -191,24 +189,20 @@ void print_symbol_table(SymbolTable *st) {
     printf("============================================================\n\n");
 }
 
-// Entrée dans un nouveau scope
 void enter_scope(SymbolTable *st) {
     st->current_scope++;
-printf("enter");
+    printf("enter\n");
 }
 
-// Sortie du scope courant
 void exit_scope(SymbolTable *st) {
-    printf("exit");
+    printf("exit\n");
 
-    // Suppression de tous les symboles du scope courant
     for (int i = 0; i < SYMBOL_TABLE_SIZE; i++) {
         Symbol *prev = NULL;
         Symbol *s = st->table[i];
         
         while (s != NULL) {
             if (s->scope_level == st->current_scope) {
-                // Suppression du symbole
                 Symbol *to_delete = s;
                 if (prev == NULL) {
                     st->table[i] = s->next;
@@ -231,7 +225,7 @@ void exit_scope(SymbolTable *st) {
 }
 
 int get_type_of_identifier(SymbolTable* table, char* name) {
-    Symbol* sym = symbol_lookup(table, name, table->current_scope);  // Passage du niveau de scope actuel
+    Symbol* sym = symbol_lookup(table, name, table->current_scope);
     if (!sym) {
         fprintf(stderr, "Erreur sémantique : variable '%s' non déclarée.\n", name);
         exit(1);
@@ -239,24 +233,17 @@ int get_type_of_identifier(SymbolTable* table, char* name) {
     return sym->data_type;
 }
 
-
-// Fonction pour récupérer le type de retour d'une fonction à partir de la table des symboles
-// Fonction pour récupérer le type de retour d'une fonction à partir de la table des symboles
 int get_function_return_type(SymbolTable *symbol_table, const char *function_name) {
-    // Parcours de la table de symboles pour trouver la fonction
     for (int i = 0; i < SYMBOL_TABLE_SIZE; i++) {
-        Symbol *s = symbol_table->table[i];  // Vérifie chaque "chaîne de collision"
+        Symbol *s = symbol_table->table[i];
         while (s != NULL) {
             if (strcmp(s->name, function_name) == 0 && s->sym_type == SYM_FUNCTION) {
-                // On retourne le type de la fonction (type de retour)
                 return s->data_type;
             }
             s = s->next;
         }
     }
     
-    // Si la fonction n'est pas trouvée, on renvoie un code d'erreur
     fprintf(stderr, "Erreur : fonction non déclarée %s\n", function_name);
-    return TYPE_UNKNOWN;  // Retourne un code pour "inconnu" si la fonction n'est pas trouvée
+    return TYPE_UNKNOWN;
 }
-

@@ -14,6 +14,19 @@ void add_quad(QuadTable *table, const char *op, const char *arg1, const char *ar
         return;
     }
 
+    const char *valid_ops[] = {"+", "-", "*", "/", "%", ":=", "if_false", "goto", "label", "call", "param", "param_receive", "return", "array_access", "array_assign", "new", "new_array", "length", "cast", "==", "!=", "<", ">", "<=", ">=", "&&", "||", "!"};
+    int is_valid = 0;
+    for (int i = 0; i < sizeof(valid_ops) / sizeof(valid_ops[0]); i++) {
+        if (strcmp(op, valid_ops[i]) == 0) {
+            is_valid = 1;
+            break;
+        }
+    }
+    if (!is_valid) {
+        fprintf(stderr, "Erreur : opérateur quadruplet invalide '%s'\n", op);
+        return;
+    }
+
     Quad *quad = malloc(sizeof(Quad));
     quad->op = op ? strdup(op) : NULL;
     quad->arg1 = arg1 ? strdup(arg1) : NULL;
