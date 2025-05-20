@@ -1113,8 +1113,30 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    print_symbol_table(&symbol_table);
+    printf("\n=== Quadruplets avant optimisation ===\n");
     print_quads(&quad_table);
+
+    propagate_copies(&quad_table);
+    printf("\n=== Après propagate_copies ===\n");
+    print_quads(&quad_table);
+
+    propagate_expressions(&quad_table);
+    printf("\n=== Après propagate_expressions ===\n");
+    print_quads(&quad_table);
+
+    remove_redundant_expressions(&quad_table);
+    printf("\n=== Après remove_redundant_expressions ===\n");
+    print_quads(&quad_table);
+
+    simplify_algebraic(&quad_table);
+    printf("\n=== Après simplify_algebraic ===\n");
+    print_quads(&quad_table);
+
+    remove_dead_code(&quad_table);
+    printf("\n=== Après remove_dead_code ===\n");
+    print_quads(&quad_table);
+
+    print_symbol_table(&symbol_table);
     free_quad_table(&quad_table);
     return 0;
 }

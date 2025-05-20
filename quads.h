@@ -1,5 +1,6 @@
 #ifndef QUADS_H
 #define QUADS_H
+#include <stdbool.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -26,5 +27,13 @@ char *new_temp(QuadTable *table);
 char *new_label(QuadTable *table);
 void print_quads(QuadTable *table);
 void free_quad_table(QuadTable *table);
+void propagate_copies(QuadTable *table);
+void propagate_expressions(QuadTable *table);
+void remove_redundant_expressions(QuadTable *table);
+void simplify_algebraic(QuadTable *table);
+void remove_dead_code(QuadTable *table);
+bool is_used(QuadTable *table, int start, const char *var) ;
+void remove_dead_code(QuadTable *table) ;
+
 
 #endif // QUADS_H

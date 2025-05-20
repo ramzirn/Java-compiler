@@ -1,5 +1,4 @@
 #include "quads.h"
-
 void init_quad_table(QuadTable *table) {
     table->quad_count = 0;
     table->temp_count = 0;
@@ -75,4 +74,134 @@ void free_quad_table(QuadTable *table) {
     }
     table->quad_count = 0;
     table->temp_count = 0;
+}
+
+
+
+void propagate_expressions(QuadTable *table) {
+    for (int i = 0; i < table->quad_count; i++) {
+        Quad *q1 = table->quads[i];
+        if (q1->op && strcmp(q1->op, "+") == 0 && q1->arg1 && q1->arg2 && q1->result) {
+            for (int j = i + 1; j < table->quad_count; j++) {
+                Quad *q2 = table->quads[j];
+                if (q2->op && strcmp(q2->op, "+") == 0 && 
+                    q2->arg1 && q2->arg2 && q2->result &&
+                    strcmp(q1->arg1, q2->arg1) == 0 && strcmp(q1->arg2, q2->arg2) == 0) {
+                    for (int k = j + 1; k < table->quad_count; k++) {
+                        Quad *next = table->quads[k];
+                        if (next->arg1 && strcmp(next->arg1, q2->result) == 0) {
+                            free(next->arg1);
+                            next->arg1 = strdup(q1->result);
+                        }
+                        if (next->arg2 && strcmp(next->arg2, q2->result) == 0) {
+                            free(next->arg2);
+                            next->arg2 = strdup(q1->result);
+                        }
+                    }
+                    free(q2->op);
+                    q2->op = strdup("NOP");
+                }
+            }
+        }
+    }
+}
+
+void remove_redundant_expressions(QuadTable *table) {
+    int new_count = 0;
+    for (int i = 0; i < table->quad_count; i++) {
+        Quad *q = table->quads[i];
+        if (q->op && strcmp(q->op, "NOP") != 0) {
+            table->quads[new_count] = q;
+            new_count++;
+        } else {
+            if (q->op) free(q->op);
+            if (q->arg1) free(q->arg1);
+            if (q->arg2) free(q->arg2);
+            if (q->result) free(q->result);
+            free(q);
+        }
+    }
+    table->quad_count = new_count;
+}
+
+
+void simplify_algebraic(QuadTable *table) {
+    for (int i = 0; i < table->quad_count; i++) {
+        Quad *q = table->quads[i];
+        if (q->op && q->arg1 && q->arg2 && q->result) {
+            if ((strcmp(q->op, "+") == 0 || strcmp(q->op, "-") == 0) && strcmp(q->arg2, "0") == 0) {
+                free(q->op);
+                q->op = strdup(":=");
+                free(q->arg2);
+                q->arg2 = NULL;
+                // Conserver arg1 comme source, result comme destination
+                // Pas besoin de modifier arg1 ou result
+            }
+        }
+    }
+}
+
+
+#include <stdbool.h>
+#include <string.h>
+#include <stdlib.h>
+#include "quads.h"
+
+bool is_used(QuadTable *table, int start, const char *var) {
+    for (int i = start; i < table->quad_count; i++) {
+        Quad *q = table->quads[i];
+        if (q->arg1 && strcmp(q->arg1, var) == 0) return true;
+        if (q->arg2 && strcmp(q->arg2, var) == 0) return true;
+        if (q->result && strcmp(q->result, var) == 0) return false;
+    }
+    return false;
+}
+
+bool is_temporary(const char *var) {
+    return var && var[0] == 't';
+}
+
+void propagate_copies(QuadTable *table) {
+    for (int i = 0; i < table->quad_count; i++) {
+        Quad *q = table->quads[i];
+        if (q->op && strcmp(q->op, ":=") == 0 && q->arg1 && q->result) {
+            char *temp = q->result;
+            char *value = q->arg1;
+            // Propager uniquement si result est une temporaire ou si la variable est peu utilisée
+            for (int j = i + 1; j < table->quad_count; j++) {
+                Quad *next = table->quads[j];
+                if (next->result && strcmp(next->result, temp) == 0) break;
+                if (next->arg1 && strcmp(next->arg1, temp) == 0) {
+                    free(next->arg1);
+                    next->arg1 = strdup(value);
+                }
+                if (next->arg2 && strcmp(next->arg2, temp) == 0) {
+                    free(next->arg2);
+                    next->arg2 = strdup(value);
+                }
+            }
+            // Marquer comme NOP uniquement si temp est une temporaire et peu utilisée
+            if (is_temporary(temp) && !is_used(table, i + 1, temp)) {
+                free(q->op);
+                q->op = strdup("NOP");
+            }
+        }
+    }
+}
+void remove_dead_code(QuadTable *table) {
+    int new_count = 0;
+    for (int i = 0; i < table->quad_count; i++) {
+        Quad *q = table->quads[i];
+        if (q->op && strcmp(q->op, "NOP") == 0) {
+            if (q->op) free(q->op);
+            if (q->arg1) free(q->arg1);
+            if (q->arg2) free(q->arg2);
+            if (q->result) free(q->result);
+            free(q);
+        } else {
+            table->quads[new_count] = q;
+            new_count++;
+        }
+    }
+    table->quad_count = new_count;
 }

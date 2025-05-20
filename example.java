@@ -1,8 +1,8 @@
-class Test {
-    int add(int a, int b) {
-        return a + b;
-    }
-    void main() {
-        int x = add(5, 10);
+public class TestOptimizations5 {
+    public static void main(String[] args) {
+        int a = 10;
+        int b = a + 0;
+        int c = b + 5;
+        int d = c - 0;
     }
 }
