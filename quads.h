@@ -34,6 +34,7 @@ void simplify_algebraic(QuadTable *table);
 void remove_dead_code(QuadTable *table);
 bool is_used(QuadTable *table, int start, const char *var) ;
 void remove_dead_code(QuadTable *table) ;
+void generate_8086_code(QuadTable *table, const char *filename); 
 
 
 #endif // QUADS_H

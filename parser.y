@@ -1135,6 +1135,7 @@ int main(int argc, char *argv[]) {
     remove_dead_code(&quad_table);
     printf("\n=== Après remove_dead_code ===\n");
     print_quads(&quad_table);
+    generate_8086_code(&quad_table, "output.asm");
 
     print_symbol_table(&symbol_table);
     free_quad_table(&quad_table);

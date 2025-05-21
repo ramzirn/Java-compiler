@@ -247,3 +247,84 @@ void remove_dead_code(QuadTable *table) {
     }
     table->quad_count = new_count;
 }
+
+#include <stdio.h>
+#include <string.h>
+#include "quads.h"
+
+// Fonction pour générer le code assembleur 8086
+void generate_8086_code(QuadTable *table, const char *filename) {
+    FILE *fp = fopen(filename, "w");
+    if (!fp) {
+        printf("Erreur : impossible d'ouvrir %s\n", filename);
+        return;
+    }
+
+    // Segment de données
+    fprintf(fp, "; Segment de données\n");
+    fprintf(fp, "DATA SEGMENT\n");
+    for (int i = 0; i < table->quad_count; i++) {
+        Quad *q = table->quads[i];
+        if (q->result && (strcmp(q->op, ":=") == 0 || strcmp(q->op, "-") == 0 || strcmp(q->op, "+") == 0 || strcmp(q->op, "cmp") == 0)) {
+            fprintf(fp, "    %s DW 0\n", q->result);
+        }
+    }
+    fprintf(fp, "DATA ENDS\n\n");
+
+    // Segment de code
+    fprintf(fp, "; Segment de code\n");
+    fprintf(fp, "CODE SEGMENT\n");
+    fprintf(fp, "    ASSUME CS:CODE, DS:DATA\n");
+    fprintf(fp, "main:\n");
+    fprintf(fp, "    MOV AX, DATA\n");
+    fprintf(fp, "    MOV DS, AX\n\n");
+
+    for (int i = 0; i < table->quad_count; i++) {
+        Quad *q = table->quads[i];
+        printf("Traite quadruplet : %s %s %s %s\n", q->op, q->arg1 ? q->arg1 : "-", q->arg2 ? q->arg2 : "-", q->result ? q->result : "-");
+        if (strcmp(q->op, "label") == 0) {
+            fprintf(fp, "%s:\n", q->arg1);
+        } else if (strcmp(q->op, "param_receive") == 0) {
+            continue;
+        } else if (strcmp(q->op, ":=") == 0) {
+            fprintf(fp, "    ; := %s - %s\n", q->arg1, q->result);
+            fprintf(fp, "    MOV AX, %s\n", q->arg1);
+            fprintf(fp, "    MOV %s, AX\n\n", q->result);
+        } else if (strcmp(q->op, "+") == 0) {
+            fprintf(fp, "    ; + %s %s %s\n", q->arg1, q->arg2, q->result);
+            fprintf(fp, "    MOV AX, %s\n", q->arg1);
+            fprintf(fp, "    ADD AX, %s\n", q->arg2);
+            fprintf(fp, "    MOV %s, AX\n\n", q->result);
+        } else if (strcmp(q->op, "-") == 0) {
+            fprintf(fp, "    ; - %s %s %s\n", q->arg1, q->arg2, q->result);
+            fprintf(fp, "    MOV AX, %s\n", q->arg1);
+            fprintf(fp, "    SUB AX, %s\n", q->arg2);
+            fprintf(fp, "    MOV %s, AX\n\n", q->result);
+        } else if (strcmp(q->op, "cmp") == 0) {
+            fprintf(fp, "    ; cmp %s %s %s\n", q->arg1, q->arg2, q->result);
+            fprintf(fp, "    MOV AX, %s\n", q->arg1);
+            fprintf(fp, "    CMP AX, %s\n", q->arg2);
+            fprintf(fp, "    MOV %s, 0\n", q->result);
+            fprintf(fp, "    JGE $+6\n");
+            fprintf(fp, "    MOV %s, 1\n", q->result);
+            fprintf(fp, "\n");
+        } else if (strcmp(q->op, "jf") == 0) {
+            fprintf(fp, "    ; jf %s %s\n", q->arg1, q->result);
+            fprintf(fp, "    CMP %s, 0\n", q->arg1);
+            fprintf(fp, "    JE %s\n\n", q->result);
+        } else if (strcmp(q->op, "goto") == 0) {
+            fprintf(fp, "    ; goto %s\n", q->result);
+            fprintf(fp, "    JMP %s\n\n", q->result);
+        } else if (strcmp(q->op, "return") == 0) {
+            fprintf(fp, "    ; return\n");
+            fprintf(fp, "    MOV AX, 4C00h\n");
+            fprintf(fp, "    INT 21h\n");
+        }
+    }
+
+    fprintf(fp, "CODE ENDS\n");
+    fprintf(fp, "END main\n");
+
+    fclose(fp);
+    printf("Code assembleur généré dans %s\n", filename);
+}

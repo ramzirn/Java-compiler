@@ -13,3 +13,4 @@ newtest.txt
 venv/
 .vscode/
 *:Zone.Identifier
+*.asm
