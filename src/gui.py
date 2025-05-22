@@ -64,7 +64,7 @@ class CompilerGUI:
         self.root.title("JavaCompiler")
         self.root.geometry("900x700")
         
-        self.compiler_path = "./javacompiler"
+        self.compiler_path = "./bin/compilateur"
         self.current_file = None
         
         self.create_widgets()
