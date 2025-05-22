@@ -16,16 +16,17 @@ Ce compilateur prend en charge :
 
 ## 🧱 Structure du projet
 
+````
 .
-├── src/ # Fichiers source C, Flex et Bison
-│ ├── lexer.l # Analyse lexicale (Flex)
-│ ├── parser.y # Analyse syntaxique (Bison)
-│ ├── semantics.c # Analyse sémantique
-│ ├── codegen.c # Génération de code
-│ └── ...
-├── test/ # Fichiers de tests
-├── Makefile # Script de compilation
-└── README.md # Ce fichier
+├── src/                  # Contient les fichiers sources pour le compilateur
+│   ├── lexer.l          # Fichier pour l'analyse lexicale (Flex)
+│   ├── parser.y         # Fichier pour l'analyse syntaxique (Bison)
+│   ├── semantics.c      # Fichier pour l'analyse sémantique
+│   ├── codegen.c        # Fichier pour la génération de code
+│   └── ...              # Autres fichiers sources éventuels
+├── test/                # Contient les fichiers de tests
+├── Makefile             # Script de compilation
+└── README.md            # Fichier de documentation
 
 ## ⚙️ Installation
 
@@ -40,8 +41,8 @@ Ce compilateur prend en charge :
 
 ```bash
 # Cloner le dépôt
-git clone https://github.com/ton-utilisateur/mon-compiler-java.git
-cd mon-compiler-java
+git clone https://github.com/ton-utilisateur/Java-compiler
+cd Java-compiler
 
 # Compiler le projet
 make build
@@ -51,7 +52,7 @@ make test
 
 # Nettoyer les fichiers générés
 make clean
-```
+````
 
 ### 🪟 Setup sur Windows
 
