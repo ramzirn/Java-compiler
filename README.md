@@ -112,6 +112,4 @@ make distclean
 
 - Ramzi Bouter
 
-## Licence
 
-Ce projet est sous licence MIT (à confirmer selon vos préférences).
